@@ -11,36 +11,53 @@
 #define INT_PIN 10
 #define TP_EN 9  // ★ 新增：TouchPad ENABLE
 
-uint8_t reportBuf[64];
+uint8_t reportBuf[128];
 
-/*===== 单指移动参数 =====*/
-float sensitivity = 0.3f;
+/*===== 参数配置区 =====*/
+// 单指移动
+float sensitivity = 0.35f;
 float smoothFactor = 0.2f;
 float accelFactor = 0.015f;
 float maxAccel = 2.5f;
 const int16_t MAX_DELTA = 30;
+const int16_t MOVE_DEADBAND = 1;
+
+// 双指滚动
+float scrollSensitivity = 0.25f;
+float scrollSmoothFactor = 0.25f;
+float scrollAccelFactor = 0.02f;
+float maxScrollAccel = 2.0f;
+const int16_t SCROLL_DEADBAND = 1;
+
+// 点击与释放
+const unsigned long TAP_MAX_MS = 200;
+const uint16_t TAP_MAX_MOVE = 20;
+const unsigned long DOUBLE_TAP_WINDOW = 250;
+const unsigned long RELEASE_TIMEOUT = 30;
+const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
+
+/*===== 状态 =====*/
+enum GestureMode { MODE_NONE, MODE_SINGLE, MODE_DOUBLE };
+GestureMode mode = MODE_NONE;
+
+int16_t lastX1 = 0, lastY1 = 0;
+int16_t lastX2 = 0, lastY2 = 0;
+unsigned long lastTouchTime = 0;
 
 float smoothDx = 0, smoothDy = 0;
 float accumX = 0, accumY = 0;
 float velX = 0, velY = 0;
 
-/*===== 双指滚动参数 =====*/
-float scrollSensitivity = 0.25f;
 float smoothScroll = 0;
 float accumScroll = 0;
 float scrollVel = 0;
 
-/*===== 状态 =====*/
-bool lastSingle = false;
-bool lastDouble = false;
-
-int16_t lastX1 = 0, lastY1 = 0;
-int16_t lastX2 = 0, lastY2 = 0;
-
-unsigned long lastTouchTime = 0;
+bool tapCandidate = false;
+unsigned long tapStartTime = 0;
+int16_t tapStartX = 0;
+int16_t tapStartY = 0;
+bool pendingClick = false;
 unsigned long lastTapTime = 0;
-const unsigned long TAP_INTERVAL = 250;
-const unsigned long RELEASE_TIMEOUT = 20;
 
 /*===========================
    冷启动 Enable 时序
@@ -85,21 +102,24 @@ void loop() {
   unsigned long now = millis();
 
   /*单指超时释放*/
-  if (lastSingle && now - lastTouchTime > RELEASE_TIMEOUT) {
-    lastSingle = false;
+  if (mode == MODE_SINGLE && now - lastTouchTime > RELEASE_TIMEOUT) {
+    mode = MODE_NONE;
     velX = velY = 0;
+    smoothDx = smoothDy = 0;
+    accumX = accumY = 0;
+    tapCandidate = false;
   }
 
   /*双指超时释放*/
-  if (lastDouble && now - lastTouchTime > RELEASE_TIMEOUT) {
-    lastDouble = false;
+  if (mode == MODE_DOUBLE && now - lastTouchTime > RELEASE_TIMEOUT) {
+    mode = MODE_NONE;
     scrollVel = 0;
     smoothScroll = 0;
     accumScroll = 0;
   }
 
   /*连续输出*/
-  if (lastSingle) {
+  if (mode == MODE_SINGLE) {
     accumX += velX;
     accumY += velY;
     int8_t mx = (int8_t)accumX;
@@ -111,7 +131,7 @@ void loop() {
     }
   }
 
-  if (lastDouble) {
+  if (mode == MODE_DOUBLE) {
     accumScroll += scrollVel;
     int8_t s = (int8_t)accumScroll;
     if (s) {
@@ -119,12 +139,18 @@ void loop() {
       accumScroll -= s;
     }
   }
+
+  if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
+    Mouse.click(MOUSE_LEFT);
+    pendingClick = false;
+  }
 }
 
 /* ===========================
    Report 解析
    =========================== */
-void handleReport(uint8_t* buf) {
+void handleReport(uint8_t* buf, uint16_t len) {
+  if (len < 13) return;
   uint8_t s0 = buf[3];
   uint8_t s1 = buf[8];
 
@@ -140,11 +166,15 @@ void handleReport(uint8_t* buf) {
 
   /*===== 双指滚动 =====*/
   if (f1 && f2) {
-    if (lastDouble) {
+    if (mode == MODE_DOUBLE) {
       int16_t dy = ((y1 - lastY1) + (y2 - lastY2)) / 2;
       dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
+      if (abs(dy) <= SCROLL_DEADBAND) dy = 0;
       float v = dy * scrollSensitivity;
-      smoothScroll += (v - smoothScroll) * 0.25f;
+      float speed = abs(v);
+      float accel = 1.0f + min(speed * scrollAccelFactor, maxScrollAccel);
+      v *= accel;
+      smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
       scrollVel = smoothScroll;
     } else {
       smoothScroll = accumScroll = 0;
@@ -155,19 +185,21 @@ void handleReport(uint8_t* buf) {
     lastX2 = x2;
     lastY2 = y2;
 
-    lastDouble = true;
-    lastSingle = false;
+    mode = MODE_DOUBLE;
+    tapCandidate = false;
     lastTouchTime = now;
     return;
   }
 
   /*===== 单指移动 =====*/
   if (f1 && !f2) {
-    if (lastSingle) {
+    if (mode == MODE_SINGLE) {
       int16_t dx = x1 - lastX1;
       int16_t dy = y1 - lastY1;
       dx = constrain(dx, -MAX_DELTA, MAX_DELTA);
       dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
+      if (abs(dx) <= MOVE_DEADBAND) dx = 0;
+      if (abs(dy) <= MOVE_DEADBAND) dy = 0;
 
       float fx = dx * sensitivity;
       float fy = dy * sensitivity;
@@ -185,26 +217,48 @@ void handleReport(uint8_t* buf) {
     } else {
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
+      velX = velY = 0;
+      tapCandidate = true;
+      tapStartTime = now;
+      tapStartX = x1;
+      tapStartY = y1;
     }
 
     lastX1 = x1;
     lastY1 = y1;
-    lastSingle = true;
-    lastDouble = false;
+    mode = MODE_SINGLE;
     lastTouchTime = now;
     return;
   }
 
-  /*===== 抬起：处理双击 =====*/
-  if (!f1 && lastSingle) {
-    if (now - lastTapTime < TAP_INTERVAL) {
-      Mouse.click(MOUSE_LEFT);
-      lastTapTime = 0;
-    } else {
-      lastTapTime = now;
+  /*===== 抬起：处理单击 =====*/
+  if (!f1 && mode == MODE_SINGLE) {
+    if (tapCandidate) {
+      unsigned long dt = now - tapStartTime;
+      uint16_t move = abs(x1 - tapStartX) + abs(y1 - tapStartY);
+      if (dt <= TAP_MAX_MS && move <= TAP_MAX_MOVE) {
+        if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
+          Mouse.click(MOUSE_LEFT);
+          Mouse.click(MOUSE_LEFT);
+          pendingClick = false;
+        } else {
+          pendingClick = true;
+          lastTapTime = now;
+        }
+      }
     }
-    lastSingle = false;
+    tapCandidate = false;
+    mode = MODE_NONE;
   }
+}
+
+bool waitIntRelease(unsigned long timeoutUs) {
+  unsigned long start = micros();
+  while (digitalRead(INT_PIN) == LOW) {
+    if (micros() - start > timeoutUs) return false;
+    delayMicroseconds(50);
+  }
+  return true;
 }
 
 /*===========================
@@ -214,16 +268,28 @@ void readInputReport() {
   Wire.beginTransmission(I2C_ADDR);
   Wire.write(INPUT_REG_L);
   Wire.write(INPUT_REG_H);
-  if (Wire.endTransmission(false) != 0) return;
+  if (Wire.endTransmission(false) != 0) {
+    waitIntRelease(INT_RELEASE_TIMEOUT_US);
+    return;
+  }
 
-  if (Wire.requestFrom(I2C_ADDR, (uint8_t)2) != 2) return;
+  if (Wire.requestFrom(I2C_ADDR, (uint8_t)2) != 2) {
+    waitIntRelease(INT_RELEASE_TIMEOUT_US);
+    return;
+  }
   uint16_t len = Wire.read() | (Wire.read() << 8);
-  if (len == 0 || len > sizeof(reportBuf)) return;
+  if (len == 0 || len > sizeof(reportBuf)) {
+    waitIntRelease(INT_RELEASE_TIMEOUT_US);
+    return;
+  }
 
-  if (Wire.requestFrom(I2C_ADDR, (uint8_t)len) != len) return;
+  if (Wire.requestFrom(I2C_ADDR, (uint8_t)len) != len) {
+    waitIntRelease(INT_RELEASE_TIMEOUT_US);
+    return;
+  }
   for (uint16_t i = 0; i < len; i++) reportBuf[i] = Wire.read();
 
-  handleReport(reportBuf);
+  handleReport(reportBuf, len);
 
-  while (digitalRead(INT_PIN) == LOW) delayMicroseconds(50);
+  waitIntRelease(INT_RELEASE_TIMEOUT_US);
 }
