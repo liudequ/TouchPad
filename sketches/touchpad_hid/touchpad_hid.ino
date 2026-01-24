@@ -32,7 +32,7 @@ const int16_t SCROLL_DEADBAND = 1;
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
 const uint16_t TAP_MAX_MOVE = 20;
-const unsigned long DOUBLE_TAP_WINDOW = 250;
+const unsigned long DOUBLE_TAP_WINDOW = 400;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 
