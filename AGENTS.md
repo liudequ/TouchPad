@@ -1,15 +1,18 @@
 # 仓库指南
 
 ## 项目结构与模块组织
-这是一个 Arduino 草图集合仓库。每个顶层文件夹都是一个独立草图或示例项目：
+这是一个 Arduino 草图集合仓库。所有可编译草图放在 `sketches/` 下，每个草图一个独立文件夹，且 `.ino` 文件名与文件夹名一致：
 
-- `Blink/`, `ScanI2C/`, `ScanPS2/`, `ScanInputReport/`, `HIDReader/`, `TwoFingerInput/`, `TinyUSBHID/`, `TryReadData/`
-- 草图文件为 `*.ino`，通常位于更深一层的目录中，例如：
-  - `Blink/Blink.ino`
-  - `ScanI2C/Scan/Scan.ino`
-  - `TinyUSBHID/FakeInput/FakeInput.ino`
+- `sketches/blink/blink.ino`
+- `sketches/i2c_scan/i2c_scan.ino`
+- `sketches/ps2_scan/ps2_scan.ino`
+- `sketches/hid_report_dump/hid_report_dump.ino`
+- `sketches/touchpad_hid/touchpad_hid.ino`
+- `sketches/two_finger_tuning/two_finger_tuning.ino`
+- `sketches/try_read_data/try_read_data.ino`
+- `sketches/tinyusb_fake_input/tinyusb_fake_input.ino`
 
-当前没有共享库目录；每个草图都是自包含的。
+文档放在 `docs/`。每个草图自包含、互不依赖。
 
 ## 构建、测试与开发命令
 这些草图通过 Arduino IDE 或 Arduino CLI 进行编译与上传。
@@ -19,12 +22,12 @@
   - `arduino-cli compile --fqbn <board_fqbn> <sketch_path>`
   - `arduino-cli upload --fqbn <board_fqbn> -p <port> <sketch_path>`
 
-将 `<board_fqbn>` 替换为实际板卡（如 `arduino:avr:uno`），将 `<sketch_path>` 替换为草图路径（如 `ScanI2C/Scan`）。
+将 `<board_fqbn>` 替换为实际板卡（如 `arduino:avr:uno`），将 `<sketch_path>` 替换为草图路径（如 `sketches/i2c_scan`）。
 
 ## 代码风格与命名规范
 - 采用标准 Arduino C++ 风格：2 空格缩进、K&R 花括号风格、清晰的函数命名。
 - 变量命名应具描述性，尽量减少全局变量。
-- 草图文件名与其所在目录保持一致（如 `ScanPS2/ScanPS2/ScanPS2.ino`）。
+- 草图文件名与其所在目录保持一致（如 `sketches/ps2_scan/ps2_scan.ino`）。
 
 ## 测试指南
 当前无自动化测试。请在目标硬件上编译并上传，使用串口监视器或设备输出验证行为。
@@ -43,8 +46,8 @@
 ## 触摸板代码概览
 这是一个触摸板项目。关键草图及职责如下：
 
-- `HIDReader/HidReader.ino`：主触摸板到鼠标实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、平滑/加速、双击、INT 触发读取、冷启动使能时序）。
-- `TwoFingerInput/TwoFingerInput.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
-- `ScanInputReport/ScanInputReport.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
-- `TryReadData/TryReadData.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
-- `ScanI2C/Scan.ino`：I2C 地址扫描器（用于定位触摸控制器地址）。
+- `sketches/touchpad_hid/touchpad_hid.ino`：主触摸板到鼠标实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、平滑/加速、双击、INT 触发读取、冷启动使能时序）。
+- `sketches/two_finger_tuning/two_finger_tuning.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
+- `sketches/hid_report_dump/hid_report_dump.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
+- `sketches/try_read_data/try_read_data.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
+- `sketches/i2c_scan/i2c_scan.ino`：I2C 地址扫描器（用于定位触摸控制器地址）。
