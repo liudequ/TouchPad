@@ -1,0 +1,50 @@
+# 仓库指南
+
+## 项目结构与模块组织
+这是一个 Arduino 草图集合仓库。每个顶层文件夹都是一个独立草图或示例项目：
+
+- `Blink/`, `ScanI2C/`, `ScanPS2/`, `ScanInputReport/`, `HIDReader/`, `TwoFingerInput/`, `TinyUSBHID/`, `TryReadData/`
+- 草图文件为 `*.ino`，通常位于更深一层的目录中，例如：
+  - `Blink/Blink.ino`
+  - `ScanI2C/Scan/Scan.ino`
+  - `TinyUSBHID/FakeInput/FakeInput.ino`
+
+当前没有共享库目录；每个草图都是自包含的。
+
+## 构建、测试与开发命令
+这些草图通过 Arduino IDE 或 Arduino CLI 进行编译与上传。
+
+- Arduino IDE：打开草图目录，点击 **Verify**（编译）或 **Upload**（上传）。
+- Arduino CLI（若已安装）：
+  - `arduino-cli compile --fqbn <board_fqbn> <sketch_path>`
+  - `arduino-cli upload --fqbn <board_fqbn> -p <port> <sketch_path>`
+
+将 `<board_fqbn>` 替换为实际板卡（如 `arduino:avr:uno`），将 `<sketch_path>` 替换为草图路径（如 `ScanI2C/Scan`）。
+
+## 代码风格与命名规范
+- 采用标准 Arduino C++ 风格：2 空格缩进、K&R 花括号风格、清晰的函数命名。
+- 变量命名应具描述性，尽量减少全局变量。
+- 草图文件名与其所在目录保持一致（如 `ScanPS2/ScanPS2/ScanPS2.ino`）。
+
+## 测试指南
+当前无自动化测试。请在目标硬件上编译并上传，使用串口监视器或设备输出验证行为。
+
+## 提交与合并请求规范
+本仓库未包含 git 历史，无法推断提交规范。如需新增规范，建议使用简短、祈使语气的提交信息（例如：“Add I2C scan timeout”）。
+
+提交变更时请包含：
+- 受影响草图的简短描述
+- 用于验证的板卡/固件环境
+- 任何连线或硬件假设
+
+## 配置提示
+部分草图涉及 USB HID 或 I2C/PS2 设备。请确认板卡支持相关接口，并在草图顶部按需调整引脚映射。
+
+## 触摸板代码概览
+这是一个触摸板项目。关键草图及职责如下：
+
+- `HIDReader/HidReader.ino`：主触摸板到鼠标实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、平滑/加速、双击、INT 触发读取、冷启动使能时序）。
+- `TwoFingerInput/TwoFingerInput.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
+- `ScanInputReport/ScanInputReport.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
+- `TryReadData/TryReadData.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
+- `ScanI2C/Scan.ino`：I2C 地址扫描器（用于定位触摸控制器地址）。

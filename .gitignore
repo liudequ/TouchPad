@@ -1,0 +1,28 @@
+# Arduino build artifacts
+*.elf
+*.hex
+*.bin
+*.map
+*.eep
+*.lst
+*.d
+*.o
+*.a
+*.so
+*.log
+
+# Arduino IDE/CLI temporary files
+*.tmp
+*.bak
+*.orig
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# AppImages or large binaries
+*.AppImage
