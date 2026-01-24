@@ -31,7 +31,6 @@ const int16_t SCROLL_DEADBAND = 1;
 
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
-const uint16_t TAP_MAX_MOVE = 20;
 const unsigned long DOUBLE_TAP_WINDOW = 400;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
@@ -235,8 +234,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
   if (!f1 && mode == MODE_SINGLE) {
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
-      uint16_t move = abs(x1 - tapStartX) + abs(y1 - tapStartY);
-      if (dt <= TAP_MAX_MS && move <= TAP_MAX_MOVE) {
+      if (dt <= TAP_MAX_MS) {
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
           Mouse.click(MOUSE_LEFT);
           Mouse.click(MOUSE_LEFT);
