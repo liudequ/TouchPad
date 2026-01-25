@@ -101,4 +101,9 @@ python -m pip install -r requirements.txt
 python3 tools/ui/touchpad_config_ui.py
 ```
 
+也可以直接运行脚本：
+```
+tools/ui/run_ui.sh
+```
+
 修改后重新编译上传即可生效。
