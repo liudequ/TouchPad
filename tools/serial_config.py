@@ -49,6 +49,7 @@ def main():
 
     sub.add_parser("save")
     sub.add_parser("load")
+    sub.add_parser("reset")
     raw_cmd = sub.add_parser("raw")
     raw_cmd.add_argument("command", help="Raw command to send, e.g. GET")
 
@@ -78,6 +79,9 @@ def main():
                 print(line)
         elif args.cmd == "load":
             for line in send_command(ser, "LOAD"):
+                print(line)
+        elif args.cmd == "reset":
+            for line in send_command(ser, "RESET"):
                 print(line)
         elif args.cmd == "raw":
             for line in send_command(ser, args.command):

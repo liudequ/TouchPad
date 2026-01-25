@@ -98,6 +98,17 @@ ZoneAction rightTopAction = ACTION_FORWARD;
 ZoneAction rightBottomAction = ACTION_RIGHT_CLICK;
 ZoneAction leftBottomAction = ACTION_NONE;
 
+void applyDefaults() {
+  scrollSensitivity = 0.00002f;
+  TOP_ZONE_PERCENT = 20;
+  SIDE_ZONE_PERCENT = 35;
+  enableNavZones = true;
+  leftTopAction = ACTION_BACK;
+  rightTopAction = ACTION_FORWARD;
+  rightBottomAction = ACTION_RIGHT_CLICK;
+  leftBottomAction = ACTION_NONE;
+}
+
 /*===========================
    冷启动 Enable 时序
    ===========================*/
@@ -127,6 +138,7 @@ void setup() {
   Wire.setClock(400000);
   delay(50);
 
+  applyDefaults();
   if (LittleFS.begin()) {
     loadConfig();
   } else {
@@ -261,6 +273,7 @@ void processCommand(const String& line) {
     Serial.println("CMD: SET <key> <value>");
     Serial.println("CMD: SAVE");
     Serial.println("CMD: LOAD");
+    Serial.println("CMD: RESET");
     return;
   }
 
@@ -441,6 +454,12 @@ void processCommand(const String& line) {
     } else {
       Serial.println("ERR: load");
     }
+    return;
+  }
+
+  if (line.equalsIgnoreCase("RESET")) {
+    applyDefaults();
+    Serial.println("OK");
     return;
   }
 

@@ -79,6 +79,7 @@ SET leftBottomAction RIGHT_CLICK
 SET sideZonePercent 35
 SAVE
 LOAD
+RESET
 ```
 说明：
 - `SET` 修改内存中的参数，`SAVE` 写入 Flash，`LOAD` 从 Flash 读取。
