@@ -222,12 +222,17 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         dialog = QtWidgets.QDialog(self)
         dialog.setWindowTitle("录制快捷键")
         dialog.setModal(True)
+        dialog.setWindowModality(QtCore.Qt.ApplicationModal)
+        dialog.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
         layout = QtWidgets.QVBoxLayout(dialog)
         label = QtWidgets.QLabel("请按下要绑定的快捷键（Esc 取消）。")
         layout.addWidget(label)
 
         dialog.keyPressEvent = lambda event: self._handle_key_capture(event, dialog, widgets)
+        dialog.grabKeyboard()
+        dialog.activateWindow()
         dialog.exec()
+        dialog.releaseKeyboard()
 
     def _handle_key_capture(self, event, dialog, widgets):
         if event.key() == QtCore.Qt.Key.Key_Escape:
@@ -244,7 +249,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         if hid_key is None:
             QtWidgets.QMessageBox.warning(self, "不支持",
                                           "该按键不支持录制。")
-            dialog.reject()
             return
         modifier = 0
         mods = event.modifiers()
