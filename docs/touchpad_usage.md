@@ -101,6 +101,8 @@ RP2040 使用 TinyUSB 复合 HID（鼠标/键盘）。请确保可用的 `Adafru
 - `pyserial`
 - `PySide6`
 
+UI 支持“录制快捷键”，按下组合键后会自动填充 `Type/Modifier/Key`（界面不提供手动输入键码）。
+
 运行示例：
 ```
 python3 -m venv .venv
