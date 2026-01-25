@@ -31,7 +31,7 @@ const int16_t SCROLL_DEADBAND = 1;
 
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
-const unsigned long DOUBLE_TAP_WINDOW = 400;
+const unsigned long DOUBLE_TAP_WINDOW = 1400;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 
@@ -140,6 +140,7 @@ void loop() {
   }
 
   if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
+    Serial.println("[tap] single click (double window expired)");
     Mouse.click(MOUSE_LEFT);
     pendingClick = false;
   }
@@ -236,13 +237,19 @@ void handleReport(uint8_t* buf, uint16_t len) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
+          Serial.println("[tap] double click");
           Mouse.click(MOUSE_LEFT);
+          delay(30);
           Mouse.click(MOUSE_LEFT);
           pendingClick = false;
         } else {
+          Serial.println("[tap] pending single click");
           pendingClick = true;
           lastTapTime = now;
         }
+      } else {
+        Serial.print("[tap] ignore, dt=");
+        Serial.println(dt);
       }
     }
     tapCandidate = false;
