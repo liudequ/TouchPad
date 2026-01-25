@@ -16,15 +16,13 @@ uint8_t reportBuf[128];
 enum {
   RID_MOUSE = 1,
   RID_KEYBOARD = 2,
-  RID_CONSUMER = 3,
 };
 
 Adafruit_USBD_HID usb_hid;
 
 uint8_t const hid_report_descriptor[] = {
   TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
-  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD)),
-  TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(RID_CONSUMER))
+  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD))
 };
 
 /*===== 参数配置区 =====*/
@@ -81,12 +79,8 @@ const int16_t TOUCH_MAX_X = 2628;
 const int16_t TOUCH_MAX_Y = 1332;
 const uint8_t TOP_ZONE_PERCENT = 20;
 const uint8_t SIDE_ZONE_PERCENT = 20;
-const uint8_t VOLUME_ZONE_PERCENT = 15;
-const uint16_t VOLUME_STEP = 40;
 
 bool enableNavZones = true;
-bool volumeMode = false;
-int16_t volumeAccum = 0;
 
 /*===========================
    冷启动 Enable 时序
@@ -142,8 +136,6 @@ void loop() {
     smoothDx = smoothDy = 0;
     accumX = accumY = 0;
     tapCandidate = false;
-    volumeMode = false;
-    volumeAccum = 0;
   }
 
   /*双指超时释放*/
@@ -156,16 +148,14 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE) {
-    if (!volumeMode) {
-      accumX += velX;
-      accumY += velY;
-      int8_t mx = (int8_t)accumX;
-      int8_t my = (int8_t)accumY;
-      if (mx || my) {
-        sendMouseMove(mx, my);
-        accumX -= mx;
-        accumY -= my;
-      }
+    accumX += velX;
+    accumY += velY;
+    int8_t mx = (int8_t)accumX;
+    int8_t my = (int8_t)accumY;
+    if (mx || my) {
+      sendMouseMove(mx, my);
+      accumX -= mx;
+      accumY -= my;
     }
   }
 
@@ -203,23 +193,12 @@ bool inRightBottomZone(int16_t x, int16_t y) {
   return x >= minX && y >= minY;
 }
 
-bool inRightSideZone(int16_t x) {
-  int16_t minX = TOUCH_MAX_X - (TOUCH_MAX_X * VOLUME_ZONE_PERCENT) / 100;
-  return x >= minX;
-}
-
 void sendBack() {
   sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT);
 }
 
 void sendForward() {
   sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT);
-}
-
-void sendConsumer(uint16_t usage) {
-  usb_hid.sendReport(RID_CONSUMER, &usage, sizeof(usage));
-  usage = 0;
-  usb_hid.sendReport(RID_CONSUMER, &usage, sizeof(usage));
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
@@ -300,20 +279,6 @@ void handleReport(uint8_t* buf, uint16_t len) {
       if (abs(dx) <= MOVE_DEADBAND) dx = 0;
       if (abs(dy) <= MOVE_DEADBAND) dy = 0;
 
-      if (volumeMode) {
-        volumeAccum += dy;
-        while (volumeAccum >= (int16_t)VOLUME_STEP) {
-          sendConsumer(HID_USAGE_CONSUMER_VOLUME_INCREMENT);
-          volumeAccum -= VOLUME_STEP;
-        }
-        while (volumeAccum <= -(int16_t)VOLUME_STEP) {
-          sendConsumer(HID_USAGE_CONSUMER_VOLUME_DECREMENT);
-          volumeAccum += VOLUME_STEP;
-        }
-        lastTouchTime = now;
-        return;
-      }
-
       if (dx == 0 && dy == 0) {
         velX = velY = 0;
         smoothDx = smoothDy = 0;
@@ -339,9 +304,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
       velX = velY = 0;
-      volumeMode = inRightSideZone(x1);
-      volumeAccum = 0;
-      tapCandidate = !volumeMode;
+      tapCandidate = true;
       tapStartTime = now;
       tapStartX = x1;
       tapStartY = y1;
@@ -356,8 +319,6 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
-    volumeMode = false;
-    volumeAccum = 0;
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
