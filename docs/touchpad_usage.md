@@ -106,4 +106,7 @@ python3 tools/ui/touchpad_config_ui.py
 tools/ui/run_ui.sh
 ```
 
+如果需要双击启动，可使用：
+- `tools/ui/touchpad_config.desktop`
+
 修改后重新编译上传即可生效。
