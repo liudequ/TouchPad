@@ -86,6 +86,19 @@ const uint8_t SIDE_ZONE_PERCENT = 35;
 
 bool enableNavZones = true;
 
+enum ZoneAction {
+  ACTION_NONE = 0,
+  ACTION_BACK = 1,
+  ACTION_FORWARD = 2,
+  ACTION_RIGHT_CLICK = 3,
+  ACTION_LEFT_CLICK = 4
+};
+
+ZoneAction leftTopAction = ACTION_BACK;
+ZoneAction rightTopAction = ACTION_FORWARD;
+ZoneAction rightBottomAction = ACTION_RIGHT_CLICK;
+ZoneAction leftBottomAction = ACTION_NONE;
+
 /*===========================
    冷启动 Enable 时序
    ===========================*/
@@ -309,12 +322,42 @@ bool inRightBottomZone(int16_t x, int16_t y) {
   return x >= minX && y >= minY;
 }
 
+bool inLeftBottomZone(int16_t x, int16_t y) {
+  int16_t maxX = (TOUCH_MAX_X * SIDE_ZONE_PERCENT) / 100;
+  int16_t minY = TOUCH_MAX_Y - (TOUCH_MAX_Y * TOP_ZONE_PERCENT) / 100;
+  return x <= maxX && y >= minY;
+}
+
 void sendBack() {
   sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT);
 }
 
 void sendForward() {
   sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT);
+}
+
+void performZoneAction(ZoneAction action) {
+  switch (action) {
+    case ACTION_BACK:
+      Serial.println("[tap] back");
+      sendBack();
+      break;
+    case ACTION_FORWARD:
+      Serial.println("[tap] forward");
+      sendForward();
+      break;
+    case ACTION_RIGHT_CLICK:
+      Serial.println("[tap] right click");
+      sendMouseClick(MOUSE_BUTTON_RIGHT);
+      break;
+    case ACTION_LEFT_CLICK:
+      Serial.println("[tap] left click");
+      sendMouseClick(MOUSE_BUTTON_LEFT);
+      break;
+    case ACTION_NONE:
+    default:
+      break;
+  }
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
@@ -439,24 +482,28 @@ void handleReport(uint8_t* buf, uint16_t len) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
         if (enableNavZones && inLeftTopZone(tapStartX, tapStartY)) {
-          Serial.println("[tap] back (left top zone)");
-          sendBack();
+          performZoneAction(leftTopAction);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
           return;
         }
         if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
-          Serial.println("[tap] forward (right top zone)");
-          sendForward();
+          performZoneAction(rightTopAction);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
           return;
         }
         if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
-          Serial.println("[tap] right click (right bottom zone)");
-          sendMouseClick(MOUSE_BUTTON_RIGHT);
+          performZoneAction(rightBottomAction);
+          pendingClick = false;
+          tapCandidate = false;
+          mode = MODE_NONE;
+          return;
+        }
+        if (enableNavZones && inLeftBottomZone(tapStartX, tapStartY)) {
+          performZoneAction(leftBottomAction);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
