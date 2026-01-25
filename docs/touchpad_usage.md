@@ -26,6 +26,7 @@
 - 移动相关：`sensitivity`、`smoothFactor`、`accelFactor`
 - 滚轮相关：`scrollSensitivity`、`scrollSmoothFactor`
 - 点击相关：`TAP_MAX_MS`、`DOUBLE_TAP_WINDOW`
+- 双击距离：`DOUBLE_TAP_MAX_MOVE`（两次点击位置的距离阈值）
 - 方向相关：`naturalScroll`（`true` 为自然滚动，`false` 为传统滚动）
 
 修改后重新编译上传即可生效。
