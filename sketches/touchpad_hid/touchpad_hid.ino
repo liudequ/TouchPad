@@ -1,7 +1,6 @@
 #include <Wire.h>
 #include <Adafruit_TinyUSB.h>
 #include <LittleFS.h>
-#include <cstring>
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -81,8 +80,8 @@ int16_t lastTapY = 0;
 // 触摸板区域（基于实测坐标范围）
 const int16_t TOUCH_MAX_X = 2628;
 const int16_t TOUCH_MAX_Y = 1332;
-const uint8_t TOP_ZONE_PERCENT = 20;
-const uint8_t SIDE_ZONE_PERCENT = 35;
+uint8_t TOP_ZONE_PERCENT = 20;
+uint8_t SIDE_ZONE_PERCENT = 35;
 
 bool enableNavZones = true;
 
@@ -140,6 +139,46 @@ void setup() {
   while (!TinyUSBDevice.mounted()) {
     delay(10);
   }
+}
+
+const char* actionToString(ZoneAction action) {
+  switch (action) {
+    case ACTION_BACK:
+      return "BACK";
+    case ACTION_FORWARD:
+      return "FORWARD";
+    case ACTION_RIGHT_CLICK:
+      return "RIGHT_CLICK";
+    case ACTION_LEFT_CLICK:
+      return "LEFT_CLICK";
+    case ACTION_NONE:
+    default:
+      return "NONE";
+  }
+}
+
+bool parseAction(const String& value, ZoneAction* out) {
+  if (value.equalsIgnoreCase("NONE") || value == "0") {
+    *out = ACTION_NONE;
+    return true;
+  }
+  if (value.equalsIgnoreCase("BACK") || value == "1") {
+    *out = ACTION_BACK;
+    return true;
+  }
+  if (value.equalsIgnoreCase("FORWARD") || value == "2") {
+    *out = ACTION_FORWARD;
+    return true;
+  }
+  if (value.equalsIgnoreCase("RIGHT_CLICK") || value == "3") {
+    *out = ACTION_RIGHT_CLICK;
+    return true;
+  }
+  if (value.equalsIgnoreCase("LEFT_CLICK") || value == "4") {
+    *out = ACTION_LEFT_CLICK;
+    return true;
+  }
+  return false;
 }
 
 /*===========================
@@ -218,15 +257,77 @@ void handleSerial() {
 void processCommand(const String& line) {
   if (line.equalsIgnoreCase("HELP")) {
     Serial.println("CMD: GET scrollSensitivity");
-    Serial.println("CMD: SET scrollSensitivity <value>");
+    Serial.println("CMD: GET");
+    Serial.println("CMD: SET <key> <value>");
     Serial.println("CMD: SAVE");
     Serial.println("CMD: LOAD");
     return;
   }
 
-  if (line.equalsIgnoreCase("GET scrollSensitivity") || line.equalsIgnoreCase("GET")) {
+  if (line.equalsIgnoreCase("GET")) {
     Serial.print("scrollSensitivity=");
     Serial.println(scrollSensitivity, 8);
+    Serial.print("topZonePercent=");
+    Serial.println(TOP_ZONE_PERCENT);
+    Serial.print("sideZonePercent=");
+    Serial.println(SIDE_ZONE_PERCENT);
+    Serial.print("enableNavZones=");
+    Serial.println(enableNavZones ? "1" : "0");
+    Serial.print("leftTopAction=");
+    Serial.println(actionToString(leftTopAction));
+    Serial.print("rightTopAction=");
+    Serial.println(actionToString(rightTopAction));
+    Serial.print("rightBottomAction=");
+    Serial.println(actionToString(rightBottomAction));
+    Serial.print("leftBottomAction=");
+    Serial.println(actionToString(leftBottomAction));
+    return;
+  }
+
+  if (line.startsWith("GET ")) {
+    String key = line.substring(4);
+    key.trim();
+    if (key.equalsIgnoreCase("scrollSensitivity")) {
+      Serial.print("scrollSensitivity=");
+      Serial.println(scrollSensitivity, 8);
+      return;
+    }
+    if (key.equalsIgnoreCase("topZonePercent")) {
+      Serial.print("topZonePercent=");
+      Serial.println(TOP_ZONE_PERCENT);
+      return;
+    }
+    if (key.equalsIgnoreCase("sideZonePercent")) {
+      Serial.print("sideZonePercent=");
+      Serial.println(SIDE_ZONE_PERCENT);
+      return;
+    }
+    if (key.equalsIgnoreCase("enableNavZones")) {
+      Serial.print("enableNavZones=");
+      Serial.println(enableNavZones ? "1" : "0");
+      return;
+    }
+    if (key.equalsIgnoreCase("leftTopAction")) {
+      Serial.print("leftTopAction=");
+      Serial.println(actionToString(leftTopAction));
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopAction")) {
+      Serial.print("rightTopAction=");
+      Serial.println(actionToString(rightTopAction));
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomAction")) {
+      Serial.print("rightBottomAction=");
+      Serial.println(actionToString(rightBottomAction));
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomAction")) {
+      Serial.print("leftBottomAction=");
+      Serial.println(actionToString(leftBottomAction));
+      return;
+    }
+    Serial.println("ERR: key");
     return;
   }
 
@@ -247,9 +348,81 @@ void processCommand(const String& line) {
       } else {
         Serial.println("ERR: value");
       }
-    } else {
-      Serial.println("ERR: key");
+      return;
     }
+    if (key.equalsIgnoreCase("topZonePercent")) {
+      int v = valueStr.toInt();
+      if (v >= 5 && v <= 50) {
+        TOP_ZONE_PERCENT = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("sideZonePercent")) {
+      int v = valueStr.toInt();
+      if (v >= 5 && v <= 50) {
+        SIDE_ZONE_PERCENT = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("enableNavZones")) {
+      if (valueStr.equalsIgnoreCase("1") || valueStr.equalsIgnoreCase("true")) {
+        enableNavZones = true;
+        Serial.println("OK");
+      } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
+        enableNavZones = false;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftTopAction")) {
+      ZoneAction action;
+      if (parseAction(valueStr, &action)) {
+        leftTopAction = action;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopAction")) {
+      ZoneAction action;
+      if (parseAction(valueStr, &action)) {
+        rightTopAction = action;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomAction")) {
+      ZoneAction action;
+      if (parseAction(valueStr, &action)) {
+        rightBottomAction = action;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomAction")) {
+      ZoneAction action;
+      if (parseAction(valueStr, &action)) {
+        leftBottomAction = action;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    Serial.println("ERR: key");
     return;
   }
 
@@ -283,12 +456,35 @@ bool loadConfig() {
   while (f.available()) {
     String line = f.readStringUntil('\n');
     line.trim();
-    if (line.startsWith("scrollSensitivity=")) {
-      String v = line.substring(strlen("scrollSensitivity="));
-      float val = v.toFloat();
-      if (val > 0.0f) {
-        scrollSensitivity = val;
-      }
+    int eq = line.indexOf('=');
+    if (eq < 0) continue;
+    String key = line.substring(0, eq);
+    String value = line.substring(eq + 1);
+    key.trim();
+    value.trim();
+    if (key.equalsIgnoreCase("scrollSensitivity")) {
+      float val = value.toFloat();
+      if (val > 0.0f) scrollSensitivity = val;
+    } else if (key.equalsIgnoreCase("topZonePercent")) {
+      int v = value.toInt();
+      if (v >= 5 && v <= 50) TOP_ZONE_PERCENT = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("sideZonePercent")) {
+      int v = value.toInt();
+      if (v >= 5 && v <= 50) SIDE_ZONE_PERCENT = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("enableNavZones")) {
+      enableNavZones = (value == "1" || value.equalsIgnoreCase("true"));
+    } else if (key.equalsIgnoreCase("leftTopAction")) {
+      ZoneAction action;
+      if (parseAction(value, &action)) leftTopAction = action;
+    } else if (key.equalsIgnoreCase("rightTopAction")) {
+      ZoneAction action;
+      if (parseAction(value, &action)) rightTopAction = action;
+    } else if (key.equalsIgnoreCase("rightBottomAction")) {
+      ZoneAction action;
+      if (parseAction(value, &action)) rightBottomAction = action;
+    } else if (key.equalsIgnoreCase("leftBottomAction")) {
+      ZoneAction action;
+      if (parseAction(value, &action)) leftBottomAction = action;
     }
   }
   f.close();
@@ -300,6 +496,20 @@ bool saveConfig() {
   if (!f) return false;
   f.print("scrollSensitivity=");
   f.println(scrollSensitivity, 8);
+  f.print("topZonePercent=");
+  f.println(TOP_ZONE_PERCENT);
+  f.print("sideZonePercent=");
+  f.println(SIDE_ZONE_PERCENT);
+  f.print("enableNavZones=");
+  f.println(enableNavZones ? "1" : "0");
+  f.print("leftTopAction=");
+  f.println(actionToString(leftTopAction));
+  f.print("rightTopAction=");
+  f.println(actionToString(rightTopAction));
+  f.print("rightBottomAction=");
+  f.println(actionToString(rightBottomAction));
+  f.print("leftBottomAction=");
+  f.println(actionToString(leftBottomAction));
   f.close();
   return true;
 }

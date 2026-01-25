@@ -39,13 +39,19 @@ def main():
     sub = parser.add_subparsers(dest="cmd")
 
     sub.add_parser("help")
-    sub.add_parser("get")
+
+    get_cmd = sub.add_parser("get")
+    get_cmd.add_argument("key", nargs="?", help="Optional key, e.g. scrollSensitivity")
 
     set_cmd = sub.add_parser("set")
-    set_cmd.add_argument("value", help="scrollSensitivity value, e.g. 0.00002")
+    set_cmd.add_argument("key", help="Config key, e.g. scrollSensitivity")
+    set_cmd.add_argument("value", help="Value, e.g. 0.00002")
 
     sub.add_parser("save")
     sub.add_parser("load")
+    raw_cmd = sub.add_parser("raw")
+    raw_cmd.add_argument("command", help="Raw command to send, e.g. GET")
+
     sub.add_parser("repl")
 
     args = parser.parse_args()
@@ -61,16 +67,20 @@ def main():
             for line in send_command(ser, "HELP"):
                 print(line)
         elif args.cmd == "get":
-            for line in send_command(ser, "GET"):
+            cmd = "GET" if args.key is None else f"GET {args.key}"
+            for line in send_command(ser, cmd):
                 print(line)
         elif args.cmd == "set":
-            for line in send_command(ser, f"SET scrollSensitivity {args.value}"):
+            for line in send_command(ser, f"SET {args.key} {args.value}"):
                 print(line)
         elif args.cmd == "save":
             for line in send_command(ser, "SAVE"):
                 print(line)
         elif args.cmd == "load":
             for line in send_command(ser, "LOAD"):
+                print(line)
+        elif args.cmd == "raw":
+            for line in send_command(ser, args.command):
                 print(line)
         else:
             repl(ser)

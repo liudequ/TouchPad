@@ -59,12 +59,24 @@
 - 方向相关：`naturalScroll`（`true` 为自然滚动，`false` 为传统滚动）
 - 区域相关：`TOP_ZONE_PERCENT`、`SIDE_ZONE_PERCENT`、`enableNavZones`
 
-## 串口配置（scrollSensitivity）
-当前支持通过串口修改并保存 `scrollSensitivity`：
+## 串口配置（区域与滚动）
+当前支持通过串口修改并保存以下参数：
+- `scrollSensitivity`
+- `topZonePercent`（上边高度百分比，5~50）
+- `sideZonePercent`（左右宽度百分比，5~50）
+- `enableNavZones`（0/1）
+- `leftTopAction`、`rightTopAction`、`rightBottomAction`、`leftBottomAction`
+
+区域动作可选值：`NONE`、`BACK`、`FORWARD`、`RIGHT_CLICK`、`LEFT_CLICK`。
+
+示例：
 ```
 HELP
 GET
+GET leftTopAction
 SET scrollSensitivity 0.00002
+SET leftBottomAction RIGHT_CLICK
+SET sideZonePercent 35
 SAVE
 LOAD
 ```
