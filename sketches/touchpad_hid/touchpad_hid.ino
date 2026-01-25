@@ -23,7 +23,7 @@ const int16_t MAX_DELTA = 30;
 const int16_t MOVE_DEADBAND = 1;
 
 // 双指滚动
-float scrollSensitivity = 0.25f;
+float scrollSensitivity = 0.1f;
 float scrollSmoothFactor = 0.25f;
 float scrollAccelFactor = 0.02f;
 float maxScrollAccel = 2.0f;
