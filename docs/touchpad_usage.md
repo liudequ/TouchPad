@@ -95,6 +95,9 @@ RP2040 使用 TinyUSB 复合 HID（鼠标/键盘）。请确保可用的 `Adafru
 
 运行示例：
 ```
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements.txt
 python3 tools/ui/touchpad_config_ui.py
 ```
 
