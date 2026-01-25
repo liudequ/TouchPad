@@ -25,6 +25,7 @@ const int16_t MOVE_DEADBAND = 1;
 // 双指滚动
 float scrollSensitivity = 0.00002f;
 float scrollSmoothFactor = 0.2f;
+bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
 
 // 点击与释放
@@ -132,7 +133,7 @@ void loop() {
     accumScroll += scrollVel;
     int8_t s = (int8_t)accumScroll;
     if (s) {
-      Mouse.move(0, 0, s);
+      Mouse.move(0, 0, naturalScroll ? s : -s);
       accumScroll -= s;
     }
   }
