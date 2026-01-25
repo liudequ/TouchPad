@@ -197,6 +197,14 @@ void handleReport(uint8_t* buf, uint16_t len) {
       if (abs(dx) <= MOVE_DEADBAND) dx = 0;
       if (abs(dy) <= MOVE_DEADBAND) dy = 0;
 
+      if (dx == 0 && dy == 0) {
+        velX = velY = 0;
+        smoothDx = smoothDy = 0;
+        accumX = accumY = 0;
+        lastTouchTime = now;
+        return;
+      }
+
       float fx = dx * sensitivity;
       float fy = dy * sensitivity;
 
