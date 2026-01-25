@@ -88,4 +88,14 @@ RESET
 ## 依赖说明
 RP2040 使用 TinyUSB 复合 HID（鼠标/键盘）。请确保可用的 `Adafruit_TinyUSB` 支持。
 
+## 上位机 UI（Python）
+可以使用 `tools/ui/touchpad_config_ui.py` 打开配置界面。依赖：
+- `pyserial`
+- `PySide6`
+
+运行示例：
+```
+python3 tools/ui/touchpad_config_ui.py
+```
+
 修改后重新编译上传即可生效。
