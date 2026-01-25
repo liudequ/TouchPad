@@ -31,6 +31,7 @@ const int16_t SCROLL_DEADBAND = 0;
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
 const unsigned long DOUBLE_TAP_WINDOW = 200;
+const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 
@@ -56,6 +57,8 @@ int16_t tapStartX = 0;
 int16_t tapStartY = 0;
 bool pendingClick = false;
 unsigned long lastTapTime = 0;
+int16_t lastTapX = 0;
+int16_t lastTapY = 0;
 
 /*===========================
    冷启动 Enable 时序
@@ -241,15 +244,27 @@ void handleReport(uint8_t* buf, uint16_t len) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
-          Serial.println("[tap] double click");
-          Mouse.click(MOUSE_LEFT);
-          delay(30);
-          Mouse.click(MOUSE_LEFT);
-          pendingClick = false;
+          uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
+          if (dist <= DOUBLE_TAP_MAX_MOVE) {
+            Serial.println("[tap] double click");
+            Mouse.click(MOUSE_LEFT);
+            delay(30);
+            Mouse.click(MOUSE_LEFT);
+            pendingClick = false;
+          } else {
+            Serial.println("[tap] double click rejected, distance too large");
+            Mouse.click(MOUSE_LEFT);
+            pendingClick = true;
+            lastTapTime = now;
+            lastTapX = tapStartX;
+            lastTapY = tapStartY;
+          }
         } else {
           Serial.println("[tap] pending single click");
           pendingClick = true;
           lastTapTime = now;
+          lastTapX = tapStartX;
+          lastTapY = tapStartY;
         }
       } else {
         Serial.print("[tap] ignore, dt=");
