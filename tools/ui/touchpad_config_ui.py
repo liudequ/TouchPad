@@ -107,6 +107,8 @@ ZONE_NAME_MAP = {
     "leftBottom": "左下角",
     "threeLeft": "三指左滑",
     "threeRight": "三指右滑",
+    "threeUp": "三指上滑",
+    "threeDown": "三指下滑",
 }
 
 
@@ -176,15 +178,22 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         swipe_layout = QtWidgets.QFormLayout(swipe_group)
         self.three_left = self._create_zone_widgets()
         self.three_right = self._create_zone_widgets()
+        self.three_up = self._create_zone_widgets()
+        self.three_down = self._create_zone_widgets()
         self._add_zone_rows(swipe_layout, "threeLeft", self.three_left)
         self._add_zone_rows(swipe_layout, "threeRight", self.three_right)
+        self._add_zone_rows(swipe_layout, "threeUp", self.three_up)
+        self._add_zone_rows(swipe_layout, "threeDown", self.three_down)
         self.three_threshold = QtWidgets.QSpinBox()
         self.three_threshold.setRange(50, 800)
+        self.three_threshold_y = QtWidgets.QSpinBox()
+        self.three_threshold_y.setRange(50, 800)
         self.three_timeout = QtWidgets.QSpinBox()
         self.three_timeout.setRange(50, 1000)
         self.three_cooldown = QtWidgets.QSpinBox()
         self.three_cooldown.setRange(0, 2000)
-        swipe_layout.addRow("滑动阈值", self.three_threshold)
+        swipe_layout.addRow("水平阈值", self.three_threshold)
+        swipe_layout.addRow("垂直阈值", self.three_threshold_y)
         swipe_layout.addRow("滑动超时(ms)", self.three_timeout)
         swipe_layout.addRow("冷却时间(ms)", self.three_cooldown)
         scroll_layout.addWidget(swipe_group)
@@ -309,8 +318,12 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._apply_zone_values(self.left_bottom, data, "leftBottom")
         self._apply_zone_values(self.three_left, data, "threeLeft")
         self._apply_zone_values(self.three_right, data, "threeRight")
-        if "threeSwipeThreshold" in data:
-            self.three_threshold.setValue(int(data["threeSwipeThreshold"]))
+        self._apply_zone_values(self.three_up, data, "threeUp")
+        self._apply_zone_values(self.three_down, data, "threeDown")
+        if "threeSwipeThresholdX" in data:
+            self.three_threshold.setValue(int(data["threeSwipeThresholdX"]))
+        if "threeSwipeThresholdY" in data:
+            self.three_threshold_y.setValue(int(data["threeSwipeThresholdY"]))
         if "threeSwipeTimeout" in data:
             self.three_timeout.setValue(int(data["threeSwipeTimeout"]))
         if "threeSwipeCooldown" in data:
@@ -384,7 +397,10 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         cmds += self._zone_set_cmds("leftBottom", self.left_bottom)
         cmds += self._zone_set_cmds("threeLeft", self.three_left)
         cmds += self._zone_set_cmds("threeRight", self.three_right)
-        cmds.append(f"SET threeSwipeThreshold {self.three_threshold.value()}")
+        cmds += self._zone_set_cmds("threeUp", self.three_up)
+        cmds += self._zone_set_cmds("threeDown", self.three_down)
+        cmds.append(f"SET threeSwipeThresholdX {self.three_threshold.value()}")
+        cmds.append(f"SET threeSwipeThresholdY {self.three_threshold_y.value()}")
         cmds.append(f"SET threeSwipeTimeout {self.three_timeout.value()}")
         cmds.append(f"SET threeSwipeCooldown {self.three_cooldown.value()}")
         for cmd in cmds:

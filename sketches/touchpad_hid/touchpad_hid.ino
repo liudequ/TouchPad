@@ -48,17 +48,31 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 
+// 三指滑动
+uint16_t threeSwipeThresholdX = 200;
+uint16_t threeSwipeThresholdY = 200;
+uint16_t threeSwipeTimeout = 350;
+uint16_t threeSwipeCooldown = 400;
+
 const char* CONFIG_PATH = "/config.txt";
 
 /*===== 状态 =====*/
 enum GestureMode { MODE_NONE,
                    MODE_SINGLE,
-                   MODE_DOUBLE };
+                   MODE_DOUBLE,
+                   MODE_TRIPLE };
 GestureMode mode = MODE_NONE;
 
 int16_t lastX1 = 0, lastY1 = 0;
 int16_t lastX2 = 0, lastY2 = 0;
 unsigned long lastTouchTime = 0;
+unsigned long lastSwipeTime = 0;
+
+int16_t tripleStartX = 0;
+int16_t tripleStartY = 0;
+int16_t tripleLastX = 0;
+int16_t tripleLastY = 0;
+unsigned long tripleStartTime = 0;
 
 float smoothDx = 0, smoothDy = 0;
 float accumX = 0, accumY = 0;
@@ -103,6 +117,11 @@ ZoneBinding rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KE
 ZoneBinding rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
 ZoneBinding leftBottomZone = { ZONE_NONE, 0, 0, 0 };
 
+ZoneBinding threeLeftBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding threeRightBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding threeUpBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding threeDownBinding = { ZONE_NONE, 0, 0, 0 };
+
 void applyDefaults() {
   scrollSensitivity = 0.00002f;
   TOP_ZONE_PERCENT = 20;
@@ -112,6 +131,14 @@ void applyDefaults() {
   rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
   rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
   leftBottomZone = { ZONE_NONE, 0, 0, 0 };
+  threeSwipeThresholdX = 200;
+  threeSwipeThresholdY = 200;
+  threeSwipeTimeout = 350;
+  threeSwipeCooldown = 400;
+  threeLeftBinding = { ZONE_NONE, 0, 0, 0 };
+  threeRightBinding = { ZONE_NONE, 0, 0, 0 };
+  threeUpBinding = { ZONE_NONE, 0, 0, 0 };
+  threeDownBinding = { ZONE_NONE, 0, 0, 0 };
 }
 
 /*===========================
@@ -214,6 +241,10 @@ void loop() {
     accumScroll = 0;
   }
 
+  if (mode == MODE_TRIPLE && now - lastTouchTime > RELEASE_TIMEOUT) {
+    mode = MODE_NONE;
+  }
+
   /*连续输出*/
   if (mode == MODE_SINGLE) {
     accumX += velX;
@@ -311,6 +342,46 @@ void processCommand(const String& line) {
     Serial.println(leftBottomZone.keyModifier);
     Serial.print("leftBottomKey=");
     Serial.println(leftBottomZone.keyCode);
+    Serial.print("threeLeftType=");
+    Serial.println(typeToString(threeLeftBinding.type));
+    Serial.print("threeLeftButtons=");
+    Serial.println(threeLeftBinding.mouseButtons);
+    Serial.print("threeLeftModifier=");
+    Serial.println(threeLeftBinding.keyModifier);
+    Serial.print("threeLeftKey=");
+    Serial.println(threeLeftBinding.keyCode);
+    Serial.print("threeRightType=");
+    Serial.println(typeToString(threeRightBinding.type));
+    Serial.print("threeRightButtons=");
+    Serial.println(threeRightBinding.mouseButtons);
+    Serial.print("threeRightModifier=");
+    Serial.println(threeRightBinding.keyModifier);
+    Serial.print("threeRightKey=");
+    Serial.println(threeRightBinding.keyCode);
+    Serial.print("threeUpType=");
+    Serial.println(typeToString(threeUpBinding.type));
+    Serial.print("threeUpButtons=");
+    Serial.println(threeUpBinding.mouseButtons);
+    Serial.print("threeUpModifier=");
+    Serial.println(threeUpBinding.keyModifier);
+    Serial.print("threeUpKey=");
+    Serial.println(threeUpBinding.keyCode);
+    Serial.print("threeDownType=");
+    Serial.println(typeToString(threeDownBinding.type));
+    Serial.print("threeDownButtons=");
+    Serial.println(threeDownBinding.mouseButtons);
+    Serial.print("threeDownModifier=");
+    Serial.println(threeDownBinding.keyModifier);
+    Serial.print("threeDownKey=");
+    Serial.println(threeDownBinding.keyCode);
+    Serial.print("threeSwipeThresholdX=");
+    Serial.println(threeSwipeThresholdX);
+    Serial.print("threeSwipeThresholdY=");
+    Serial.println(threeSwipeThresholdY);
+    Serial.print("threeSwipeTimeout=");
+    Serial.println(threeSwipeTimeout);
+    Serial.print("threeSwipeCooldown=");
+    Serial.println(threeSwipeCooldown);
     return;
   }
 
@@ -415,6 +486,106 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("leftBottomKey")) {
       Serial.print("leftBottomKey=");
       Serial.println(leftBottomZone.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftType")) {
+      Serial.print("threeLeftType=");
+      Serial.println(typeToString(threeLeftBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftButtons")) {
+      Serial.print("threeLeftButtons=");
+      Serial.println(threeLeftBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftModifier")) {
+      Serial.print("threeLeftModifier=");
+      Serial.println(threeLeftBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftKey")) {
+      Serial.print("threeLeftKey=");
+      Serial.println(threeLeftBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightType")) {
+      Serial.print("threeRightType=");
+      Serial.println(typeToString(threeRightBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightButtons")) {
+      Serial.print("threeRightButtons=");
+      Serial.println(threeRightBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightModifier")) {
+      Serial.print("threeRightModifier=");
+      Serial.println(threeRightBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightKey")) {
+      Serial.print("threeRightKey=");
+      Serial.println(threeRightBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpType")) {
+      Serial.print("threeUpType=");
+      Serial.println(typeToString(threeUpBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpButtons")) {
+      Serial.print("threeUpButtons=");
+      Serial.println(threeUpBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpModifier")) {
+      Serial.print("threeUpModifier=");
+      Serial.println(threeUpBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpKey")) {
+      Serial.print("threeUpKey=");
+      Serial.println(threeUpBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownType")) {
+      Serial.print("threeDownType=");
+      Serial.println(typeToString(threeDownBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownButtons")) {
+      Serial.print("threeDownButtons=");
+      Serial.println(threeDownBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownModifier")) {
+      Serial.print("threeDownModifier=");
+      Serial.println(threeDownBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownKey")) {
+      Serial.print("threeDownKey=");
+      Serial.println(threeDownBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
+      Serial.print("threeSwipeThresholdX=");
+      Serial.println(threeSwipeThresholdX);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeThresholdY")) {
+      Serial.print("threeSwipeThresholdY=");
+      Serial.println(threeSwipeThresholdY);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeTimeout")) {
+      Serial.print("threeSwipeTimeout=");
+      Serial.println(threeSwipeTimeout);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeCooldown")) {
+      Serial.print("threeSwipeCooldown=");
+      Serial.println(threeSwipeCooldown);
       return;
     }
     Serial.println("ERR: key");
@@ -632,6 +803,206 @@ void processCommand(const String& line) {
       }
       return;
     }
+    if (key.equalsIgnoreCase("threeLeftType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeLeftBinding.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeLeftBinding.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeLeftBinding.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeLeftKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeLeftBinding.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeRightBinding.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeRightBinding.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeRightBinding.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeRightKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeRightBinding.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeUpBinding.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeUpBinding.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeUpBinding.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeUpKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeUpBinding.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeDownBinding.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeDownBinding.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeDownBinding.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDownKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeDownBinding.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 800) {
+        threeSwipeThresholdX = (uint16_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeThresholdY")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 800) {
+        threeSwipeThresholdY = (uint16_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeTimeout")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 1000) {
+        threeSwipeTimeout = (uint16_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeSwipeCooldown")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 2000) {
+        threeSwipeCooldown = (uint16_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
     Serial.println("ERR: key");
     return;
   }
@@ -737,6 +1108,66 @@ bool loadConfig() {
     } else if (key.equalsIgnoreCase("leftBottomKey")) {
       int v = value.toInt();
       if (v >= 0 && v <= 255) leftBottomZone.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeLeftType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeLeftBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeLeftButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeLeftBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeLeftModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeLeftBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeLeftKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeLeftBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeRightType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeRightBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeRightButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeRightBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeRightModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeRightBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeRightKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeRightBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeUpType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeUpBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeUpButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeUpBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeUpModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeUpBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeUpKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeUpBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDownType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeDownBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeDownButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeDownBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDownModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeDownBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDownKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeDownBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 800) threeSwipeThresholdX = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("threeSwipeThresholdY")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 800) threeSwipeThresholdY = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("threeSwipeTimeout")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 1000) threeSwipeTimeout = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("threeSwipeCooldown")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 2000) threeSwipeCooldown = (uint16_t)v;
     }
   }
   f.close();
@@ -786,6 +1217,46 @@ bool saveConfig() {
   f.println(leftBottomZone.keyModifier);
   f.print("leftBottomKey=");
   f.println(leftBottomZone.keyCode);
+  f.print("threeLeftType=");
+  f.println(typeToString(threeLeftBinding.type));
+  f.print("threeLeftButtons=");
+  f.println(threeLeftBinding.mouseButtons);
+  f.print("threeLeftModifier=");
+  f.println(threeLeftBinding.keyModifier);
+  f.print("threeLeftKey=");
+  f.println(threeLeftBinding.keyCode);
+  f.print("threeRightType=");
+  f.println(typeToString(threeRightBinding.type));
+  f.print("threeRightButtons=");
+  f.println(threeRightBinding.mouseButtons);
+  f.print("threeRightModifier=");
+  f.println(threeRightBinding.keyModifier);
+  f.print("threeRightKey=");
+  f.println(threeRightBinding.keyCode);
+  f.print("threeUpType=");
+  f.println(typeToString(threeUpBinding.type));
+  f.print("threeUpButtons=");
+  f.println(threeUpBinding.mouseButtons);
+  f.print("threeUpModifier=");
+  f.println(threeUpBinding.keyModifier);
+  f.print("threeUpKey=");
+  f.println(threeUpBinding.keyCode);
+  f.print("threeDownType=");
+  f.println(typeToString(threeDownBinding.type));
+  f.print("threeDownButtons=");
+  f.println(threeDownBinding.mouseButtons);
+  f.print("threeDownModifier=");
+  f.println(threeDownBinding.keyModifier);
+  f.print("threeDownKey=");
+  f.println(threeDownBinding.keyCode);
+  f.print("threeSwipeThresholdX=");
+  f.println(threeSwipeThresholdX);
+  f.print("threeSwipeThresholdY=");
+  f.println(threeSwipeThresholdY);
+  f.print("threeSwipeTimeout=");
+  f.println(threeSwipeTimeout);
+  f.print("threeSwipeCooldown=");
+  f.println(threeSwipeCooldown);
   f.close();
   return true;
 }
@@ -870,16 +1341,65 @@ void handleReport(uint8_t* buf, uint16_t len) {
   if (len < 13) return;
   uint8_t s0 = buf[3];
   uint8_t s1 = buf[8];
+  uint8_t s2 = (len >= 18) ? buf[13] : 0;
 
   bool f1 = s0 & 0x02;
   bool f2 = s1 & 0x02;
+  bool f3 = (len >= 18) ? (s2 & 0x02) : false;
 
   int16_t x1 = buf[4] | (buf[5] << 8);
   int16_t y1 = buf[6] | (buf[7] << 8);
   int16_t x2 = buf[9] | (buf[10] << 8);
   int16_t y2 = buf[11] | (buf[12] << 8);
+  int16_t x3 = (len >= 18) ? (buf[14] | (buf[15] << 8)) : 0;
+  int16_t y3 = (len >= 18) ? (buf[16] | (buf[17] << 8)) : 0;
 
   unsigned long now = millis();
+
+  /*===== 三指左右滑动 =====*/
+  if (f1 && f2 && f3) {
+    int16_t avgX = (x1 + x2 + x3) / 3;
+    int16_t avgY = (y1 + y2 + y3) / 3;
+    if (mode != MODE_TRIPLE) {
+      tripleStartX = avgX;
+      tripleStartY = avgY;
+      tripleLastX = avgX;
+      tripleLastY = avgY;
+      tripleStartTime = now;
+    } else {
+      tripleLastX = avgX;
+      tripleLastY = avgY;
+    }
+    mode = MODE_TRIPLE;
+    tapCandidate = false;
+    lastTouchTime = now;
+    return;
+  }
+
+  if (mode == MODE_TRIPLE && !(f1 && f2 && f3)) {
+    int16_t dx = tripleLastX - tripleStartX;
+    int16_t dy = tripleLastY - tripleStartY;
+    unsigned long dt = now - tripleStartTime;
+    if (dt <= threeSwipeTimeout && now - lastSwipeTime >= threeSwipeCooldown) {
+      if (abs(dx) >= (int16_t)threeSwipeThresholdX && abs(dx) >= abs(dy)) {
+        if (dx > 0) {
+          performZoneAction(threeRightBinding);
+        } else {
+          performZoneAction(threeLeftBinding);
+        }
+        lastSwipeTime = now;
+      } else if (abs(dy) >= (int16_t)threeSwipeThresholdY && abs(dy) > abs(dx)) {
+        if (dy > 0) {
+          performZoneAction(threeDownBinding);
+        } else {
+          performZoneAction(threeUpBinding);
+        }
+        lastSwipeTime = now;
+      }
+    }
+    mode = MODE_NONE;
+    return;
+  }
 
   /*===== 双指滚动 =====*/
   if (f1 && f2) {

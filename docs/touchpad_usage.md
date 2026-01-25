@@ -23,6 +23,7 @@
 - 左上角轻触：后退（Alt+Left）。
 - 右上角轻触：前进（Alt+Right）。
 - 右下角轻触：右键。
+- 三指左右/上下滑动：触发配置绑定的动作。
 
 ## 区域说明
 当前区域划分为上边 20% 高度、左右各 35% 宽度：
@@ -69,6 +70,15 @@
 - `leftTopButtons` / `rightTopButtons` / `rightBottomButtons` / `leftBottomButtons`
 - `leftTopModifier` / `rightTopModifier` / `rightBottomModifier` / `leftBottomModifier`
 - `leftTopKey` / `rightTopKey` / `rightBottomKey` / `leftBottomKey`
+- `threeLeftType` / `threeRightType`
+- `threeLeftButtons` / `threeRightButtons`
+- `threeLeftModifier` / `threeRightModifier`
+- `threeLeftKey` / `threeRightKey`
+- `threeUpType` / `threeDownType`
+- `threeUpButtons` / `threeDownButtons`
+- `threeUpModifier` / `threeDownModifier`
+- `threeUpKey` / `threeDownKey`
+- `threeSwipeThresholdX` / `threeSwipeThresholdY` / `threeSwipeTimeout` / `threeSwipeCooldown`
 
 区域类型可选值：`NONE`、`MOUSE`、`KEYBOARD`。
 
@@ -84,6 +94,12 @@ GET leftTopType
 SET scrollSensitivity 0.00002
 SET leftBottomType MOUSE
 SET leftBottomButtons 2
+SET threeLeftType KEYBOARD
+SET threeLeftModifier 5
+SET threeLeftKey 80
+SET threeUpType KEYBOARD
+SET threeUpModifier 5
+SET threeUpKey 82
 SET sideZonePercent 35
 SAVE
 LOAD
