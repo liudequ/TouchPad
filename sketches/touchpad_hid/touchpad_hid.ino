@@ -1,5 +1,6 @@
 #include <Wire.h>
 #include <Mouse.h>
+#include <Keyboard.h>
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -60,6 +61,14 @@ unsigned long lastTapTime = 0;
 int16_t lastTapX = 0;
 int16_t lastTapY = 0;
 
+// 触摸板区域（基于实测坐标范围）
+const int16_t TOUCH_MAX_X = 2628;
+const int16_t TOUCH_MAX_Y = 1332;
+const uint8_t TOP_ZONE_PERCENT = 20;
+const uint8_t SIDE_ZONE_PERCENT = 20;
+
+bool enableNavZones = true;
+
 /*===========================
    冷启动 Enable 时序
    ===========================*/
@@ -90,6 +99,7 @@ void setup() {
   delay(50);
 
   Mouse.begin();
+  Keyboard.begin();
 }
 
 /*===========================
@@ -146,6 +156,32 @@ void loop() {
     Mouse.click(MOUSE_LEFT);
     pendingClick = false;
   }
+}
+
+bool inLeftTopZone(int16_t x, int16_t y) {
+  int16_t maxX = (TOUCH_MAX_X * SIDE_ZONE_PERCENT) / 100;
+  int16_t maxY = (TOUCH_MAX_Y * TOP_ZONE_PERCENT) / 100;
+  return x <= maxX && y <= maxY;
+}
+
+bool inRightTopZone(int16_t x, int16_t y) {
+  int16_t minX = TOUCH_MAX_X - (TOUCH_MAX_X * SIDE_ZONE_PERCENT) / 100;
+  int16_t maxY = (TOUCH_MAX_Y * TOP_ZONE_PERCENT) / 100;
+  return x >= minX && y <= maxY;
+}
+
+void sendBack() {
+  Keyboard.press(KEY_LEFT_ALT);
+  Keyboard.press(KEY_LEFT_ARROW);
+  delay(10);
+  Keyboard.releaseAll();
+}
+
+void sendForward() {
+  Keyboard.press(KEY_LEFT_ALT);
+  Keyboard.press(KEY_RIGHT_ARROW);
+  delay(10);
+  Keyboard.releaseAll();
 }
 
 /* ===========================
@@ -243,6 +279,22 @@ void handleReport(uint8_t* buf, uint16_t len) {
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
+        if (enableNavZones && inLeftTopZone(tapStartX, tapStartY)) {
+          Serial.println("[tap] back (left top zone)");
+          sendBack();
+          pendingClick = false;
+          tapCandidate = false;
+          mode = MODE_NONE;
+          return;
+        }
+        if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
+          Serial.println("[tap] forward (right top zone)");
+          sendForward();
+          pendingClick = false;
+          tapCandidate = false;
+          mode = MODE_NONE;
+          return;
+        }
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
           uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
           if (dist <= DOUBLE_TAP_MAX_MOVE) {

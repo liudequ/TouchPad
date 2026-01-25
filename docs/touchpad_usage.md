@@ -20,6 +20,8 @@
 - 双指上下滑动：滚轮滚动。
 - 单指轻触抬起：单击。
 - 双击：在短时间内连续两次轻触抬起。
+- 左上角轻触：后退（Alt+Left）。
+- 右上角轻触：前进（Alt+Right）。
 
 ## 坐标范围记录
 实测坐标范围如下（用于区域划分与调试）：
@@ -33,5 +35,6 @@
 - 点击相关：`TAP_MAX_MS`、`DOUBLE_TAP_WINDOW`
 - 双击距离：`DOUBLE_TAP_MAX_MOVE`（两次点击位置的距离阈值）
 - 方向相关：`naturalScroll`（`true` 为自然滚动，`false` 为传统滚动）
+- 区域相关：`TOP_ZONE_PERCENT`、`SIDE_ZONE_PERCENT`、`enableNavZones`
 
 修改后重新编译上传即可生效。
