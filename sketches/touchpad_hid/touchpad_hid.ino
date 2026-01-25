@@ -132,7 +132,7 @@ void loop() {
     accumScroll += scrollVel;
     int8_t s = (int8_t)accumScroll;
     if (s) {
-      Mouse.move(0, 0, -s);
+      Mouse.move(0, 0, s);
       accumScroll -= s;
     }
   }
