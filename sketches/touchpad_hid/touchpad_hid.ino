@@ -1,6 +1,5 @@
 #include <Wire.h>
-#include <Mouse.h>
-#include <Keyboard.h>
+#include <Adafruit_TinyUSB.h>
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -13,6 +12,20 @@
 #define TP_EN 9  // ★ 新增：TouchPad ENABLE
 
 uint8_t reportBuf[128];
+
+enum {
+  RID_MOUSE = 1,
+  RID_KEYBOARD = 2,
+  RID_CONSUMER = 3,
+};
+
+Adafruit_USBD_HID usb_hid;
+
+uint8_t const hid_report_descriptor[] = {
+  TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
+  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD)),
+  TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(RID_CONSUMER))
+};
 
 /*===== 参数配置区 =====*/
 // 单指移动
@@ -37,7 +50,9 @@ const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 
 /*===== 状态 =====*/
-enum GestureMode { MODE_NONE, MODE_SINGLE, MODE_DOUBLE };
+enum GestureMode { MODE_NONE,
+                   MODE_SINGLE,
+                   MODE_DOUBLE };
 GestureMode mode = MODE_NONE;
 
 int16_t lastX1 = 0, lastY1 = 0;
@@ -66,8 +81,12 @@ const int16_t TOUCH_MAX_X = 2628;
 const int16_t TOUCH_MAX_Y = 1332;
 const uint8_t TOP_ZONE_PERCENT = 20;
 const uint8_t SIDE_ZONE_PERCENT = 20;
+const uint8_t VOLUME_ZONE_PERCENT = 15;
+const uint16_t VOLUME_STEP = 40;
 
 bool enableNavZones = true;
+bool volumeMode = false;
+int16_t volumeAccum = 0;
 
 /*===========================
    冷启动 Enable 时序
@@ -98,8 +117,12 @@ void setup() {
   Wire.setClock(400000);
   delay(50);
 
-  Mouse.begin();
-  Keyboard.begin();
+  usb_hid.setReportDescriptor(hid_report_descriptor,
+                              sizeof(hid_report_descriptor));
+  usb_hid.begin();
+  while (!TinyUSBDevice.mounted()) {
+    delay(10);
+  }
 }
 
 /*===========================
@@ -119,6 +142,8 @@ void loop() {
     smoothDx = smoothDy = 0;
     accumX = accumY = 0;
     tapCandidate = false;
+    volumeMode = false;
+    volumeAccum = 0;
   }
 
   /*双指超时释放*/
@@ -131,14 +156,16 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE) {
-    accumX += velX;
-    accumY += velY;
-    int8_t mx = (int8_t)accumX;
-    int8_t my = (int8_t)accumY;
-    if (mx || my) {
-      Mouse.move(mx, my);
-      accumX -= mx;
-      accumY -= my;
+    if (!volumeMode) {
+      accumX += velX;
+      accumY += velY;
+      int8_t mx = (int8_t)accumX;
+      int8_t my = (int8_t)accumY;
+      if (mx || my) {
+        sendMouseMove(mx, my);
+        accumX -= mx;
+        accumY -= my;
+      }
     }
   }
 
@@ -146,14 +173,14 @@ void loop() {
     accumScroll += scrollVel;
     int8_t s = (int8_t)accumScroll;
     if (s) {
-      Mouse.move(0, 0, naturalScroll ? s : -s);
+      sendMouseWheel(naturalScroll ? s : -s);
       accumScroll -= s;
     }
   }
 
   if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
     Serial.println("[tap] single click (double window expired)");
-    Mouse.click(MOUSE_LEFT);
+    sendMouseClick(MOUSE_BUTTON_LEFT);
     pendingClick = false;
   }
 }
@@ -170,18 +197,55 @@ bool inRightTopZone(int16_t x, int16_t y) {
   return x >= minX && y <= maxY;
 }
 
+bool inRightBottomZone(int16_t x, int16_t y) {
+  int16_t minX = TOUCH_MAX_X - (TOUCH_MAX_X * SIDE_ZONE_PERCENT) / 100;
+  int16_t minY = TOUCH_MAX_Y - (TOUCH_MAX_Y * TOP_ZONE_PERCENT) / 100;
+  return x >= minX && y >= minY;
+}
+
+bool inRightSideZone(int16_t x) {
+  int16_t minX = TOUCH_MAX_X - (TOUCH_MAX_X * VOLUME_ZONE_PERCENT) / 100;
+  return x >= minX;
+}
+
 void sendBack() {
-  Keyboard.press(KEY_LEFT_ALT);
-  Keyboard.press(KEY_LEFT_ARROW);
-  delay(10);
-  Keyboard.releaseAll();
+  sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT);
 }
 
 void sendForward() {
-  Keyboard.press(KEY_LEFT_ALT);
-  Keyboard.press(KEY_RIGHT_ARROW);
-  delay(10);
-  Keyboard.releaseAll();
+  sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT);
+}
+
+void sendConsumer(uint16_t usage) {
+  usb_hid.sendReport(RID_CONSUMER, &usage, sizeof(usage));
+  usage = 0;
+  usb_hid.sendReport(RID_CONSUMER, &usage, sizeof(usage));
+}
+
+void sendMouseMove(int8_t x, int8_t y) {
+  uint8_t report[5] = { 0, (uint8_t)x, (uint8_t)y, 0, 0 };
+  usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+}
+
+void sendMouseWheel(int8_t wheel) {
+  uint8_t report[5] = { 0, 0, 0, (uint8_t)wheel, 0 };
+  usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+}
+
+void sendMouseClick(uint8_t buttons) {
+  uint8_t report[5] = { buttons, 0, 0, 0, 0 };
+  usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+  delay(5);
+  report[0] = 0;
+  usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+}
+
+void sendKeyboard(uint8_t modifier, uint8_t keycode) {
+  uint8_t report[8] = { modifier, 0, keycode, 0, 0, 0, 0, 0 };
+  usb_hid.sendReport(RID_KEYBOARD, report, sizeof(report));
+  delay(5);
+  for (uint8_t i = 0; i < sizeof(report); i++) report[i] = 0;
+  usb_hid.sendReport(RID_KEYBOARD, report, sizeof(report));
 }
 
 /* ===========================
@@ -236,6 +300,20 @@ void handleReport(uint8_t* buf, uint16_t len) {
       if (abs(dx) <= MOVE_DEADBAND) dx = 0;
       if (abs(dy) <= MOVE_DEADBAND) dy = 0;
 
+      if (volumeMode) {
+        volumeAccum += dy;
+        while (volumeAccum >= (int16_t)VOLUME_STEP) {
+          sendConsumer(HID_USAGE_CONSUMER_VOLUME_INCREMENT);
+          volumeAccum -= VOLUME_STEP;
+        }
+        while (volumeAccum <= -(int16_t)VOLUME_STEP) {
+          sendConsumer(HID_USAGE_CONSUMER_VOLUME_DECREMENT);
+          volumeAccum += VOLUME_STEP;
+        }
+        lastTouchTime = now;
+        return;
+      }
+
       if (dx == 0 && dy == 0) {
         velX = velY = 0;
         smoothDx = smoothDy = 0;
@@ -261,7 +339,9 @@ void handleReport(uint8_t* buf, uint16_t len) {
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
       velX = velY = 0;
-      tapCandidate = true;
+      volumeMode = inRightSideZone(x1);
+      volumeAccum = 0;
+      tapCandidate = !volumeMode;
       tapStartTime = now;
       tapStartX = x1;
       tapStartY = y1;
@@ -276,6 +356,8 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
+    volumeMode = false;
+    volumeAccum = 0;
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
@@ -295,17 +377,25 @@ void handleReport(uint8_t* buf, uint16_t len) {
           mode = MODE_NONE;
           return;
         }
+        if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
+          Serial.println("[tap] right click (right bottom zone)");
+          sendMouseClick(MOUSE_BUTTON_RIGHT);
+          pendingClick = false;
+          tapCandidate = false;
+          mode = MODE_NONE;
+          return;
+        }
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
           uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
           if (dist <= DOUBLE_TAP_MAX_MOVE) {
             Serial.println("[tap] double click");
-            Mouse.click(MOUSE_LEFT);
+            sendMouseClick(MOUSE_BUTTON_LEFT);
             delay(30);
-            Mouse.click(MOUSE_LEFT);
+            sendMouseClick(MOUSE_BUTTON_LEFT);
             pendingClick = false;
           } else {
             Serial.println("[tap] double click rejected, distance too large");
-            Mouse.click(MOUSE_LEFT);
+            sendMouseClick(MOUSE_BUTTON_LEFT);
             pendingClick = true;
             lastTapTime = now;
             lastTapX = tapStartX;
