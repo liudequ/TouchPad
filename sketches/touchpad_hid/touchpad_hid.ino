@@ -1,5 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_TinyUSB.h>
+#include <LittleFS.h>
+#include <cstring>
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -46,6 +48,8 @@ const unsigned long DOUBLE_TAP_WINDOW = 200;
 const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
+
+const char* CONFIG_PATH = "/config.txt";
 
 /*===== 状态 =====*/
 enum GestureMode { MODE_NONE,
@@ -111,6 +115,12 @@ void setup() {
   Wire.setClock(400000);
   delay(50);
 
+  if (LittleFS.begin()) {
+    loadConfig();
+  } else {
+    Serial.println("[cfg] LittleFS mount failed");
+  }
+
   usb_hid.setReportDescriptor(hid_report_descriptor,
                               sizeof(hid_report_descriptor));
   usb_hid.begin();
@@ -123,6 +133,7 @@ void setup() {
    主循环
    ===========================*/
 void loop() {
+  handleSerial();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
@@ -173,6 +184,111 @@ void loop() {
     sendMouseClick(MOUSE_BUTTON_LEFT);
     pendingClick = false;
   }
+}
+
+void handleSerial() {
+  static String line;
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == '\n') {
+      line.trim();
+      if (line.length() > 0) {
+        processCommand(line);
+      }
+      line = "";
+    } else if (c != '\r') {
+      line += c;
+    }
+  }
+}
+
+void processCommand(const String& line) {
+  if (line.equalsIgnoreCase("HELP")) {
+    Serial.println("CMD: GET scrollSensitivity");
+    Serial.println("CMD: SET scrollSensitivity <value>");
+    Serial.println("CMD: SAVE");
+    Serial.println("CMD: LOAD");
+    return;
+  }
+
+  if (line.equalsIgnoreCase("GET scrollSensitivity") || line.equalsIgnoreCase("GET")) {
+    Serial.print("scrollSensitivity=");
+    Serial.println(scrollSensitivity, 8);
+    return;
+  }
+
+  if (line.startsWith("SET ")) {
+    int keyEnd = line.indexOf(' ', 4);
+    if (keyEnd < 0) {
+      Serial.println("ERR: SET format");
+      return;
+    }
+    String key = line.substring(4, keyEnd);
+    String valueStr = line.substring(keyEnd + 1);
+    valueStr.trim();
+    if (key.equalsIgnoreCase("scrollSensitivity")) {
+      float v = valueStr.toFloat();
+      if (v > 0.0f) {
+        scrollSensitivity = v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+    } else {
+      Serial.println("ERR: key");
+    }
+    return;
+  }
+
+  if (line.equalsIgnoreCase("SAVE")) {
+    if (saveConfig()) {
+      Serial.println("OK");
+    } else {
+      Serial.println("ERR: save");
+    }
+    return;
+  }
+
+  if (line.equalsIgnoreCase("LOAD")) {
+    if (loadConfig()) {
+      Serial.println("OK");
+    } else {
+      Serial.println("ERR: load");
+    }
+    return;
+  }
+
+  Serial.println("ERR: unknown");
+}
+
+bool loadConfig() {
+  File f = LittleFS.open(CONFIG_PATH, "r");
+  if (!f) {
+    Serial.println("[cfg] no config");
+    return false;
+  }
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.startsWith("scrollSensitivity=")) {
+      String v = line.substring(strlen("scrollSensitivity="));
+      float val = v.toFloat();
+      if (val > 0.0f) {
+        scrollSensitivity = val;
+      }
+    }
+  }
+  f.close();
+  return true;
+}
+
+bool saveConfig() {
+  File f = LittleFS.open(CONFIG_PATH, "w");
+  if (!f) return false;
+  f.print("scrollSensitivity=");
+  f.println(scrollSensitivity, 8);
+  f.close();
+  return true;
 }
 
 bool inLeftTopZone(int16_t x, int16_t y) {

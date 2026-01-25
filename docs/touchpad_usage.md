@@ -42,7 +42,7 @@
 │                 右键         │  下边 20%
 │                (右下)        │
 └──────────────────────────────┘
-   左 20%                 右 20%
+   左 35%                 右 35%
 ```
 
 ## 坐标范围记录
@@ -58,6 +58,20 @@
 - 双击距离：`DOUBLE_TAP_MAX_MOVE`（两次点击位置的距离阈值）
 - 方向相关：`naturalScroll`（`true` 为自然滚动，`false` 为传统滚动）
 - 区域相关：`TOP_ZONE_PERCENT`、`SIDE_ZONE_PERCENT`、`enableNavZones`
+
+## 串口配置（scrollSensitivity）
+当前支持通过串口修改并保存 `scrollSensitivity`：
+```
+HELP
+GET
+SET scrollSensitivity 0.00002
+SAVE
+LOAD
+```
+说明：
+- `SET` 修改内存中的参数，`SAVE` 写入 Flash，`LOAD` 从 Flash 读取。
+- 串口波特率固定为 `115200`。
+
 ## 依赖说明
 RP2040 使用 TinyUSB 复合 HID（鼠标/键盘）。请确保可用的 `Adafruit_TinyUSB` 支持。
 
