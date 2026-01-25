@@ -23,10 +23,10 @@ const int16_t MAX_DELTA = 30;
 const int16_t MOVE_DEADBAND = 1;
 
 // 双指滚动
-float scrollSensitivity = 0.1f;
+float scrollSensitivity = 0.05f;
 float scrollSmoothFactor = 0.25f;
-float scrollAccelFactor = 0.02f;
-float maxScrollAccel = 2.0f;
+float scrollAccelFactor = 0.002f;
+float maxScrollAccel = 3.0f;
 const int16_t SCROLL_DEADBAND = 1;
 
 // 点击与释放
@@ -171,8 +171,8 @@ void handleReport(uint8_t* buf, uint16_t len) {
       dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
       if (abs(dy) <= SCROLL_DEADBAND) dy = 0;
       float v = dy * scrollSensitivity;
-      float speed = abs(v);
-      float accel = 1.0f + min(speed * scrollAccelFactor, maxScrollAccel);
+      float speed = abs(dy);
+      float accel = 1.0f + min(speed * speed * scrollAccelFactor, maxScrollAccel);
       v *= accel;
       smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
       scrollVel = smoothScroll;
