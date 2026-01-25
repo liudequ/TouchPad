@@ -78,7 +78,7 @@ int16_t lastTapY = 0;
 const int16_t TOUCH_MAX_X = 2628;
 const int16_t TOUCH_MAX_Y = 1332;
 const uint8_t TOP_ZONE_PERCENT = 20;
-const uint8_t SIDE_ZONE_PERCENT = 20;
+const uint8_t SIDE_ZONE_PERCENT = 35;
 
 bool enableNavZones = true;
 
