@@ -85,28 +85,33 @@ uint8_t SIDE_ZONE_PERCENT = 35;
 
 bool enableNavZones = true;
 
-enum ZoneAction {
-  ACTION_NONE = 0,
-  ACTION_BACK = 1,
-  ACTION_FORWARD = 2,
-  ACTION_RIGHT_CLICK = 3,
-  ACTION_LEFT_CLICK = 4
+enum ZoneType {
+  ZONE_NONE = 0,
+  ZONE_MOUSE = 1,
+  ZONE_KEYBOARD = 2
 };
 
-ZoneAction leftTopAction = ACTION_BACK;
-ZoneAction rightTopAction = ACTION_FORWARD;
-ZoneAction rightBottomAction = ACTION_RIGHT_CLICK;
-ZoneAction leftBottomAction = ACTION_NONE;
+struct ZoneBinding {
+  ZoneType type;
+  uint8_t mouseButtons;
+  uint8_t keyModifier;
+  uint8_t keyCode;
+};
+
+ZoneBinding leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
+ZoneBinding rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
+ZoneBinding rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
+ZoneBinding leftBottomZone = { ZONE_NONE, 0, 0, 0 };
 
 void applyDefaults() {
   scrollSensitivity = 0.00002f;
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
   enableNavZones = true;
-  leftTopAction = ACTION_BACK;
-  rightTopAction = ACTION_FORWARD;
-  rightBottomAction = ACTION_RIGHT_CLICK;
-  leftBottomAction = ACTION_NONE;
+  leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
+  rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
+  rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
+  leftBottomZone = { ZONE_NONE, 0, 0, 0 };
 }
 
 /*===========================
@@ -153,41 +158,29 @@ void setup() {
   }
 }
 
-const char* actionToString(ZoneAction action) {
-  switch (action) {
-    case ACTION_BACK:
-      return "BACK";
-    case ACTION_FORWARD:
-      return "FORWARD";
-    case ACTION_RIGHT_CLICK:
-      return "RIGHT_CLICK";
-    case ACTION_LEFT_CLICK:
-      return "LEFT_CLICK";
-    case ACTION_NONE:
+const char* typeToString(ZoneType type) {
+  switch (type) {
+    case ZONE_MOUSE:
+      return "MOUSE";
+    case ZONE_KEYBOARD:
+      return "KEYBOARD";
+    case ZONE_NONE:
     default:
       return "NONE";
   }
 }
 
-bool parseAction(const String& value, ZoneAction* out) {
+bool parseType(const String& value, ZoneType* out) {
   if (value.equalsIgnoreCase("NONE") || value == "0") {
-    *out = ACTION_NONE;
+    *out = ZONE_NONE;
     return true;
   }
-  if (value.equalsIgnoreCase("BACK") || value == "1") {
-    *out = ACTION_BACK;
+  if (value.equalsIgnoreCase("MOUSE") || value == "1") {
+    *out = ZONE_MOUSE;
     return true;
   }
-  if (value.equalsIgnoreCase("FORWARD") || value == "2") {
-    *out = ACTION_FORWARD;
-    return true;
-  }
-  if (value.equalsIgnoreCase("RIGHT_CLICK") || value == "3") {
-    *out = ACTION_RIGHT_CLICK;
-    return true;
-  }
-  if (value.equalsIgnoreCase("LEFT_CLICK") || value == "4") {
-    *out = ACTION_LEFT_CLICK;
+  if (value.equalsIgnoreCase("KEYBOARD") || value == "2") {
+    *out = ZONE_KEYBOARD;
     return true;
   }
   return false;
@@ -286,14 +279,38 @@ void processCommand(const String& line) {
     Serial.println(SIDE_ZONE_PERCENT);
     Serial.print("enableNavZones=");
     Serial.println(enableNavZones ? "1" : "0");
-    Serial.print("leftTopAction=");
-    Serial.println(actionToString(leftTopAction));
-    Serial.print("rightTopAction=");
-    Serial.println(actionToString(rightTopAction));
-    Serial.print("rightBottomAction=");
-    Serial.println(actionToString(rightBottomAction));
-    Serial.print("leftBottomAction=");
-    Serial.println(actionToString(leftBottomAction));
+    Serial.print("leftTopType=");
+    Serial.println(typeToString(leftTopZone.type));
+    Serial.print("leftTopButtons=");
+    Serial.println(leftTopZone.mouseButtons);
+    Serial.print("leftTopModifier=");
+    Serial.println(leftTopZone.keyModifier);
+    Serial.print("leftTopKey=");
+    Serial.println(leftTopZone.keyCode);
+    Serial.print("rightTopType=");
+    Serial.println(typeToString(rightTopZone.type));
+    Serial.print("rightTopButtons=");
+    Serial.println(rightTopZone.mouseButtons);
+    Serial.print("rightTopModifier=");
+    Serial.println(rightTopZone.keyModifier);
+    Serial.print("rightTopKey=");
+    Serial.println(rightTopZone.keyCode);
+    Serial.print("rightBottomType=");
+    Serial.println(typeToString(rightBottomZone.type));
+    Serial.print("rightBottomButtons=");
+    Serial.println(rightBottomZone.mouseButtons);
+    Serial.print("rightBottomModifier=");
+    Serial.println(rightBottomZone.keyModifier);
+    Serial.print("rightBottomKey=");
+    Serial.println(rightBottomZone.keyCode);
+    Serial.print("leftBottomType=");
+    Serial.println(typeToString(leftBottomZone.type));
+    Serial.print("leftBottomButtons=");
+    Serial.println(leftBottomZone.mouseButtons);
+    Serial.print("leftBottomModifier=");
+    Serial.println(leftBottomZone.keyModifier);
+    Serial.print("leftBottomKey=");
+    Serial.println(leftBottomZone.keyCode);
     return;
   }
 
@@ -320,24 +337,84 @@ void processCommand(const String& line) {
       Serial.println(enableNavZones ? "1" : "0");
       return;
     }
-    if (key.equalsIgnoreCase("leftTopAction")) {
-      Serial.print("leftTopAction=");
-      Serial.println(actionToString(leftTopAction));
+    if (key.equalsIgnoreCase("leftTopType")) {
+      Serial.print("leftTopType=");
+      Serial.println(typeToString(leftTopZone.type));
       return;
     }
-    if (key.equalsIgnoreCase("rightTopAction")) {
-      Serial.print("rightTopAction=");
-      Serial.println(actionToString(rightTopAction));
+    if (key.equalsIgnoreCase("leftTopButtons")) {
+      Serial.print("leftTopButtons=");
+      Serial.println(leftTopZone.mouseButtons);
       return;
     }
-    if (key.equalsIgnoreCase("rightBottomAction")) {
-      Serial.print("rightBottomAction=");
-      Serial.println(actionToString(rightBottomAction));
+    if (key.equalsIgnoreCase("leftTopModifier")) {
+      Serial.print("leftTopModifier=");
+      Serial.println(leftTopZone.keyModifier);
       return;
     }
-    if (key.equalsIgnoreCase("leftBottomAction")) {
-      Serial.print("leftBottomAction=");
-      Serial.println(actionToString(leftBottomAction));
+    if (key.equalsIgnoreCase("leftTopKey")) {
+      Serial.print("leftTopKey=");
+      Serial.println(leftTopZone.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopType")) {
+      Serial.print("rightTopType=");
+      Serial.println(typeToString(rightTopZone.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopButtons")) {
+      Serial.print("rightTopButtons=");
+      Serial.println(rightTopZone.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopModifier")) {
+      Serial.print("rightTopModifier=");
+      Serial.println(rightTopZone.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopKey")) {
+      Serial.print("rightTopKey=");
+      Serial.println(rightTopZone.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomType")) {
+      Serial.print("rightBottomType=");
+      Serial.println(typeToString(rightBottomZone.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomButtons")) {
+      Serial.print("rightBottomButtons=");
+      Serial.println(rightBottomZone.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomModifier")) {
+      Serial.print("rightBottomModifier=");
+      Serial.println(rightBottomZone.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomKey")) {
+      Serial.print("rightBottomKey=");
+      Serial.println(rightBottomZone.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomType")) {
+      Serial.print("leftBottomType=");
+      Serial.println(typeToString(leftBottomZone.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomButtons")) {
+      Serial.print("leftBottomButtons=");
+      Serial.println(leftBottomZone.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomModifier")) {
+      Serial.print("leftBottomModifier=");
+      Serial.println(leftBottomZone.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomKey")) {
+      Serial.print("leftBottomKey=");
+      Serial.println(leftBottomZone.keyCode);
       return;
     }
     Serial.println("ERR: key");
@@ -395,40 +472,160 @@ void processCommand(const String& line) {
       }
       return;
     }
-    if (key.equalsIgnoreCase("leftTopAction")) {
-      ZoneAction action;
-      if (parseAction(valueStr, &action)) {
-        leftTopAction = action;
+    if (key.equalsIgnoreCase("leftTopType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        leftTopZone.type = type;
         Serial.println("OK");
       } else {
         Serial.println("ERR: value");
       }
       return;
     }
-    if (key.equalsIgnoreCase("rightTopAction")) {
-      ZoneAction action;
-      if (parseAction(valueStr, &action)) {
-        rightTopAction = action;
+    if (key.equalsIgnoreCase("leftTopButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        leftTopZone.mouseButtons = (uint8_t)v;
         Serial.println("OK");
       } else {
         Serial.println("ERR: value");
       }
       return;
     }
-    if (key.equalsIgnoreCase("rightBottomAction")) {
-      ZoneAction action;
-      if (parseAction(valueStr, &action)) {
-        rightBottomAction = action;
+    if (key.equalsIgnoreCase("leftTopModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        leftTopZone.keyModifier = (uint8_t)v;
         Serial.println("OK");
       } else {
         Serial.println("ERR: value");
       }
       return;
     }
-    if (key.equalsIgnoreCase("leftBottomAction")) {
-      ZoneAction action;
-      if (parseAction(valueStr, &action)) {
-        leftBottomAction = action;
+    if (key.equalsIgnoreCase("leftTopKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        leftTopZone.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        rightTopZone.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        rightTopZone.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        rightTopZone.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightTopKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        rightTopZone.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        rightBottomZone.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        rightBottomZone.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        rightBottomZone.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rightBottomKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        rightBottomZone.keyCode = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        leftBottomZone.type = type;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        leftBottomZone.mouseButtons = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        leftBottomZone.keyModifier = (uint8_t)v;
+        Serial.println("OK");
+      } else {
+        Serial.println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("leftBottomKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        leftBottomZone.keyCode = (uint8_t)v;
         Serial.println("OK");
       } else {
         Serial.println("ERR: value");
@@ -492,18 +689,54 @@ bool loadConfig() {
       if (v >= 5 && v <= 50) SIDE_ZONE_PERCENT = (uint8_t)v;
     } else if (key.equalsIgnoreCase("enableNavZones")) {
       enableNavZones = (value == "1" || value.equalsIgnoreCase("true"));
-    } else if (key.equalsIgnoreCase("leftTopAction")) {
-      ZoneAction action;
-      if (parseAction(value, &action)) leftTopAction = action;
-    } else if (key.equalsIgnoreCase("rightTopAction")) {
-      ZoneAction action;
-      if (parseAction(value, &action)) rightTopAction = action;
-    } else if (key.equalsIgnoreCase("rightBottomAction")) {
-      ZoneAction action;
-      if (parseAction(value, &action)) rightBottomAction = action;
-    } else if (key.equalsIgnoreCase("leftBottomAction")) {
-      ZoneAction action;
-      if (parseAction(value, &action)) leftBottomAction = action;
+    } else if (key.equalsIgnoreCase("leftTopType")) {
+      ZoneType type;
+      if (parseType(value, &type)) leftTopZone.type = type;
+    } else if (key.equalsIgnoreCase("leftTopButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) leftTopZone.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("leftTopModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) leftTopZone.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("leftTopKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) leftTopZone.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightTopType")) {
+      ZoneType type;
+      if (parseType(value, &type)) rightTopZone.type = type;
+    } else if (key.equalsIgnoreCase("rightTopButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) rightTopZone.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightTopModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) rightTopZone.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightTopKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) rightTopZone.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightBottomType")) {
+      ZoneType type;
+      if (parseType(value, &type)) rightBottomZone.type = type;
+    } else if (key.equalsIgnoreCase("rightBottomButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) rightBottomZone.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightBottomModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) rightBottomZone.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("rightBottomKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) rightBottomZone.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("leftBottomType")) {
+      ZoneType type;
+      if (parseType(value, &type)) leftBottomZone.type = type;
+    } else if (key.equalsIgnoreCase("leftBottomButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) leftBottomZone.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("leftBottomModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) leftBottomZone.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("leftBottomKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) leftBottomZone.keyCode = (uint8_t)v;
     }
   }
   f.close();
@@ -521,14 +754,38 @@ bool saveConfig() {
   f.println(SIDE_ZONE_PERCENT);
   f.print("enableNavZones=");
   f.println(enableNavZones ? "1" : "0");
-  f.print("leftTopAction=");
-  f.println(actionToString(leftTopAction));
-  f.print("rightTopAction=");
-  f.println(actionToString(rightTopAction));
-  f.print("rightBottomAction=");
-  f.println(actionToString(rightBottomAction));
-  f.print("leftBottomAction=");
-  f.println(actionToString(leftBottomAction));
+  f.print("leftTopType=");
+  f.println(typeToString(leftTopZone.type));
+  f.print("leftTopButtons=");
+  f.println(leftTopZone.mouseButtons);
+  f.print("leftTopModifier=");
+  f.println(leftTopZone.keyModifier);
+  f.print("leftTopKey=");
+  f.println(leftTopZone.keyCode);
+  f.print("rightTopType=");
+  f.println(typeToString(rightTopZone.type));
+  f.print("rightTopButtons=");
+  f.println(rightTopZone.mouseButtons);
+  f.print("rightTopModifier=");
+  f.println(rightTopZone.keyModifier);
+  f.print("rightTopKey=");
+  f.println(rightTopZone.keyCode);
+  f.print("rightBottomType=");
+  f.println(typeToString(rightBottomZone.type));
+  f.print("rightBottomButtons=");
+  f.println(rightBottomZone.mouseButtons);
+  f.print("rightBottomModifier=");
+  f.println(rightBottomZone.keyModifier);
+  f.print("rightBottomKey=");
+  f.println(rightBottomZone.keyCode);
+  f.print("leftBottomType=");
+  f.println(typeToString(leftBottomZone.type));
+  f.print("leftBottomButtons=");
+  f.println(leftBottomZone.mouseButtons);
+  f.print("leftBottomModifier=");
+  f.println(leftBottomZone.keyModifier);
+  f.print("leftBottomKey=");
+  f.println(leftBottomZone.keyCode);
   f.close();
   return true;
 }
@@ -565,27 +822,18 @@ void sendForward() {
   sendKeyboard(KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT);
 }
 
-void performZoneAction(ZoneAction action) {
-  switch (action) {
-    case ACTION_BACK:
-      Serial.println("[tap] back");
-      sendBack();
-      break;
-    case ACTION_FORWARD:
-      Serial.println("[tap] forward");
-      sendForward();
-      break;
-    case ACTION_RIGHT_CLICK:
-      Serial.println("[tap] right click");
-      sendMouseClick(MOUSE_BUTTON_RIGHT);
-      break;
-    case ACTION_LEFT_CLICK:
-      Serial.println("[tap] left click");
-      sendMouseClick(MOUSE_BUTTON_LEFT);
-      break;
-    case ACTION_NONE:
-    default:
-      break;
+void performZoneAction(const ZoneBinding& binding) {
+  if (binding.type == ZONE_MOUSE) {
+    if (binding.mouseButtons) {
+      sendMouseClick(binding.mouseButtons);
+    }
+    return;
+  }
+  if (binding.type == ZONE_KEYBOARD) {
+    if (binding.keyCode) {
+      sendKeyboard(binding.keyModifier, binding.keyCode);
+    }
+    return;
   }
 }
 
@@ -711,28 +959,28 @@ void handleReport(uint8_t* buf, uint16_t len) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
         if (enableNavZones && inLeftTopZone(tapStartX, tapStartY)) {
-          performZoneAction(leftTopAction);
+          performZoneAction(leftTopZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
           return;
         }
         if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
-          performZoneAction(rightTopAction);
+          performZoneAction(rightTopZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
           return;
         }
         if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
-          performZoneAction(rightBottomAction);
+          performZoneAction(rightBottomZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
           return;
         }
         if (enableNavZones && inLeftBottomZone(tapStartX, tapStartY)) {
-          performZoneAction(leftBottomAction);
+          performZoneAction(leftBottomZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;

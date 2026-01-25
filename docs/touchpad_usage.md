@@ -65,17 +65,25 @@
 - `topZonePercent`（上边高度百分比，5~50）
 - `sideZonePercent`（左右宽度百分比，5~50）
 - `enableNavZones`（0/1）
-- `leftTopAction`、`rightTopAction`、`rightBottomAction`、`leftBottomAction`
+- `leftTopType` / `rightTopType` / `rightBottomType` / `leftBottomType`
+- `leftTopButtons` / `rightTopButtons` / `rightBottomButtons` / `leftBottomButtons`
+- `leftTopModifier` / `rightTopModifier` / `rightBottomModifier` / `leftBottomModifier`
+- `leftTopKey` / `rightTopKey` / `rightBottomKey` / `leftBottomKey`
 
-区域动作可选值：`NONE`、`BACK`、`FORWARD`、`RIGHT_CLICK`、`LEFT_CLICK`。
+区域类型可选值：`NONE`、`MOUSE`、`KEYBOARD`。
+
+常用修饰键位掩码（可组合）：`CTRL=1`、`SHIFT=2`、`ALT=4`、`GUI=8`。
+
+常用按键码示例：`RIGHT=79`、`LEFT=80`、`DOWN=81`、`UP=82`。
 
 示例：
 ```
 HELP
 GET
-GET leftTopAction
+GET leftTopType
 SET scrollSensitivity 0.00002
-SET leftBottomAction RIGHT_CLICK
+SET leftBottomType MOUSE
+SET leftBottomButtons 2
 SET sideZonePercent 35
 SAVE
 LOAD

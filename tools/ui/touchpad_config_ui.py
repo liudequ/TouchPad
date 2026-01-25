@@ -6,7 +6,7 @@ from PySide6 import QtCore, QtWidgets
 from serial_client import SerialClient
 
 
-ACTIONS = ["NONE", "BACK", "FORWARD", "RIGHT_CLICK", "LEFT_CLICK"]
+ZONE_TYPES = ["NONE", "MOUSE", "KEYBOARD"]
 
 
 class TouchpadConfigUI(QtWidgets.QWidget):
@@ -53,19 +53,16 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         zone_layout.addRow(self.enable_zones)
         layout.addWidget(zone_group)
 
-        action_group = QtWidgets.QGroupBox("Zone Actions")
+        action_group = QtWidgets.QGroupBox("Zone Bindings")
         action_layout = QtWidgets.QFormLayout(action_group)
-        self.left_top_action = QtWidgets.QComboBox()
-        self.right_top_action = QtWidgets.QComboBox()
-        self.right_bottom_action = QtWidgets.QComboBox()
-        self.left_bottom_action = QtWidgets.QComboBox()
-        for cb in (self.left_top_action, self.right_top_action,
-                   self.right_bottom_action, self.left_bottom_action):
-            cb.addItems(ACTIONS)
-        action_layout.addRow("leftTopAction", self.left_top_action)
-        action_layout.addRow("rightTopAction", self.right_top_action)
-        action_layout.addRow("rightBottomAction", self.right_bottom_action)
-        action_layout.addRow("leftBottomAction", self.left_bottom_action)
+        self.left_top = self._create_zone_widgets()
+        self.right_top = self._create_zone_widgets()
+        self.right_bottom = self._create_zone_widgets()
+        self.left_bottom = self._create_zone_widgets()
+        self._add_zone_rows(action_layout, "leftTop", self.left_top)
+        self._add_zone_rows(action_layout, "rightTop", self.right_top)
+        self._add_zone_rows(action_layout, "rightBottom", self.right_bottom)
+        self._add_zone_rows(action_layout, "leftBottom", self.left_bottom)
         layout.addWidget(action_group)
 
         ops_layout = QtWidgets.QHBoxLayout()
@@ -135,20 +132,52 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.side_percent.setValue(int(data["sideZonePercent"]))
         if "enableNavZones" in data:
             self.enable_zones.setChecked(data["enableNavZones"] == "1")
-        if "leftTopAction" in data:
-            self._set_combo(self.left_top_action, data["leftTopAction"])
-        if "rightTopAction" in data:
-            self._set_combo(self.right_top_action, data["rightTopAction"])
-        if "rightBottomAction" in data:
-            self._set_combo(self.right_bottom_action, data["rightBottomAction"])
-        if "leftBottomAction" in data:
-            self._set_combo(self.left_bottom_action, data["leftBottomAction"])
+        self._apply_zone_values(self.left_top, data, "leftTop")
+        self._apply_zone_values(self.right_top, data, "rightTop")
+        self._apply_zone_values(self.right_bottom, data, "rightBottom")
+        self._apply_zone_values(self.left_bottom, data, "leftBottom")
         self._log("Values refreshed")
 
     def _set_combo(self, combo, value):
         value = value.strip().upper()
-        if value in ACTIONS:
+        if value in ZONE_TYPES:
             combo.setCurrentText(value)
+
+    def _create_zone_widgets(self):
+        type_combo = QtWidgets.QComboBox()
+        type_combo.addItems(ZONE_TYPES)
+        buttons = QtWidgets.QSpinBox()
+        buttons.setRange(0, 7)
+        modifier = QtWidgets.QSpinBox()
+        modifier.setRange(0, 255)
+        key = QtWidgets.QSpinBox()
+        key.setRange(0, 255)
+        return {
+            "type": type_combo,
+            "buttons": buttons,
+            "modifier": modifier,
+            "key": key,
+        }
+
+    def _add_zone_rows(self, layout, name, widgets):
+        layout.addRow(f"{name}Type", widgets["type"])
+        layout.addRow(f"{name}Buttons", widgets["buttons"])
+        layout.addRow(f"{name}Modifier", widgets["modifier"])
+        layout.addRow(f"{name}Key", widgets["key"])
+
+    def _apply_zone_values(self, widgets, data, name):
+        type_key = f"{name}Type"
+        buttons_key = f"{name}Buttons"
+        modifier_key = f"{name}Modifier"
+        key_key = f"{name}Key"
+        if type_key in data:
+            self._set_combo(widgets["type"], data[type_key])
+        if buttons_key in data:
+            widgets["buttons"].setValue(int(data[buttons_key]))
+        if modifier_key in data:
+            widgets["modifier"].setValue(int(data[modifier_key]))
+        if key_key in data:
+            widgets["key"].setValue(int(data[key_key]))
 
     def _apply(self):
         if not self.client.is_connected():
@@ -159,11 +188,11 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             f"SET topZonePercent {self.top_percent.value()}",
             f"SET sideZonePercent {self.side_percent.value()}",
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",
-            f"SET leftTopAction {self.left_top_action.currentText()}",
-            f"SET rightTopAction {self.right_top_action.currentText()}",
-            f"SET rightBottomAction {self.right_bottom_action.currentText()}",
-            f"SET leftBottomAction {self.left_bottom_action.currentText()}",
         ]
+        cmds += self._zone_set_cmds("leftTop", self.left_top)
+        cmds += self._zone_set_cmds("rightTop", self.right_top)
+        cmds += self._zone_set_cmds("rightBottom", self.right_bottom)
+        cmds += self._zone_set_cmds("leftBottom", self.left_bottom)
         for cmd in cmds:
             for line in self.client.send(cmd):
                 self._log(line)
@@ -185,6 +214,14 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             return
         for line in self.client.send(cmd):
             self._log(line)
+
+    def _zone_set_cmds(self, name, widgets):
+        return [
+            f"SET {name}Type {widgets['type'].currentText()}",
+            f"SET {name}Buttons {widgets['buttons'].value()}",
+            f"SET {name}Modifier {widgets['modifier'].value()}",
+            f"SET {name}Key {widgets['key'].value()}",
+        ]
 
 
 def main():
