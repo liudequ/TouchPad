@@ -105,6 +105,8 @@ ZONE_NAME_MAP = {
     "rightTop": "右上角",
     "rightBottom": "右下角",
     "leftBottom": "左下角",
+    "threeLeft": "三指左滑",
+    "threeRight": "三指右滑",
 }
 
 
@@ -131,14 +133,20 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         conn_layout.addWidget(self.status_label)
         layout.addWidget(conn_group)
 
+        scroll_area = QtWidgets.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll_container = QtWidgets.QWidget()
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_container)
+
         scroll_group = QtWidgets.QGroupBox("滚动")
-        scroll_layout = QtWidgets.QFormLayout(scroll_group)
+        scroll_group_layout = QtWidgets.QFormLayout(scroll_group)
         self.scroll_sensitivity = QtWidgets.QDoubleSpinBox()
         self.scroll_sensitivity.setDecimals(8)
         self.scroll_sensitivity.setSingleStep(0.000001)
         self.scroll_sensitivity.setRange(0.0, 1.0)
-        scroll_layout.addRow("滚动灵敏度", self.scroll_sensitivity)
-        layout.addWidget(scroll_group)
+        scroll_group_layout.addRow("滚动灵敏度", self.scroll_sensitivity)
+        scroll_layout.addWidget(scroll_group)
 
         zone_group = QtWidgets.QGroupBox("区域")
         zone_layout = QtWidgets.QFormLayout(zone_group)
@@ -150,7 +158,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         zone_layout.addRow("上边高度百分比", self.top_percent)
         zone_layout.addRow("左右宽度百分比", self.side_percent)
         zone_layout.addRow(self.enable_zones)
-        layout.addWidget(zone_group)
+        scroll_layout.addWidget(zone_group)
 
         action_group = QtWidgets.QGroupBox("区域绑定")
         action_layout = QtWidgets.QFormLayout(action_group)
@@ -162,7 +170,24 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._add_zone_rows(action_layout, "rightTop", self.right_top)
         self._add_zone_rows(action_layout, "rightBottom", self.right_bottom)
         self._add_zone_rows(action_layout, "leftBottom", self.left_bottom)
-        layout.addWidget(action_group)
+        scroll_layout.addWidget(action_group)
+
+        swipe_group = QtWidgets.QGroupBox("三指滑动")
+        swipe_layout = QtWidgets.QFormLayout(swipe_group)
+        self.three_left = self._create_zone_widgets()
+        self.three_right = self._create_zone_widgets()
+        self._add_zone_rows(swipe_layout, "threeLeft", self.three_left)
+        self._add_zone_rows(swipe_layout, "threeRight", self.three_right)
+        self.three_threshold = QtWidgets.QSpinBox()
+        self.three_threshold.setRange(50, 800)
+        self.three_timeout = QtWidgets.QSpinBox()
+        self.three_timeout.setRange(50, 1000)
+        self.three_cooldown = QtWidgets.QSpinBox()
+        self.three_cooldown.setRange(0, 2000)
+        swipe_layout.addRow("滑动阈值", self.three_threshold)
+        swipe_layout.addRow("滑动超时(ms)", self.three_timeout)
+        swipe_layout.addRow("冷却时间(ms)", self.three_cooldown)
+        scroll_layout.addWidget(swipe_group)
 
         ops_layout = QtWidgets.QHBoxLayout()
         self.apply_btn = QtWidgets.QPushButton("应用")
@@ -175,7 +200,11 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         ops_layout.addWidget(self.save_btn)
         ops_layout.addWidget(self.load_btn)
         ops_layout.addWidget(self.reset_btn)
-        layout.addLayout(ops_layout)
+        scroll_layout.addLayout(ops_layout)
+
+        scroll_layout.addStretch(1)
+        scroll_area.setWidget(scroll_container)
+        layout.addWidget(scroll_area)
 
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
@@ -274,6 +303,14 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._apply_zone_values(self.right_top, data, "rightTop")
         self._apply_zone_values(self.right_bottom, data, "rightBottom")
         self._apply_zone_values(self.left_bottom, data, "leftBottom")
+        self._apply_zone_values(self.three_left, data, "threeLeft")
+        self._apply_zone_values(self.three_right, data, "threeRight")
+        if "threeSwipeThreshold" in data:
+            self.three_threshold.setValue(int(data["threeSwipeThreshold"]))
+        if "threeSwipeTimeout" in data:
+            self.three_timeout.setValue(int(data["threeSwipeTimeout"]))
+        if "threeSwipeCooldown" in data:
+            self.three_cooldown.setValue(int(data["threeSwipeCooldown"]))
         self._log("已读取当前值")
 
     def _set_combo(self, combo, value):
@@ -341,6 +378,11 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         cmds += self._zone_set_cmds("rightTop", self.right_top)
         cmds += self._zone_set_cmds("rightBottom", self.right_bottom)
         cmds += self._zone_set_cmds("leftBottom", self.left_bottom)
+        cmds += self._zone_set_cmds("threeLeft", self.three_left)
+        cmds += self._zone_set_cmds("threeRight", self.three_right)
+        cmds.append(f"SET threeSwipeThreshold {self.three_threshold.value()}")
+        cmds.append(f"SET threeSwipeTimeout {self.three_timeout.value()}")
+        cmds.append(f"SET threeSwipeCooldown {self.three_cooldown.value()}")
         for cmd in cmds:
             for line in self.client.send(cmd):
                 self._log(line)
