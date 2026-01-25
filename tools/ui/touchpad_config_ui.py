@@ -204,6 +204,13 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         if event.key() == QtCore.Qt.Key.Key_Escape:
             dialog.reject()
             return
+        if event.key() in (
+            QtCore.Qt.Key.Key_Shift,
+            QtCore.Qt.Key.Key_Control,
+            QtCore.Qt.Key.Key_Alt,
+            QtCore.Qt.Key.Key_Meta,
+        ):
+            return
         hid_key = HID_KEY_MAP.get(event.key())
         if hid_key is None:
             QtWidgets.QMessageBox.warning(self, "不支持",
