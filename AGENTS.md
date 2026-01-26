@@ -7,7 +7,8 @@
 - `sketches/i2c_scan/i2c_scan.ino`
 - `sketches/ps2_scan/ps2_scan.ino`
 - `sketches/hid_report_dump/hid_report_dump.ino`
-- `sketches/touchpad_hid/touchpad_hid.ino`
+- `sketches/touchpad_hid_pico/touchpad_hid_pico.ino`
+- `sketches/touchpad_hid_nrf/touchpad_hid_nrf.ino`
 - `sketches/two_finger_tuning/two_finger_tuning.ino`
 - `sketches/try_read_data/try_read_data.ino`
 - `sketches/tinyusb_fake_input/tinyusb_fake_input.ino`
@@ -46,7 +47,8 @@
 ## 触摸板代码概览
 这是一个触摸板项目。关键草图及职责如下：
 
-- `sketches/touchpad_hid/touchpad_hid.ino`：主触摸板到鼠标实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、平滑/加速、双击、INT 触发读取、冷启动使能时序）。
+- `sketches/touchpad_hid_pico/touchpad_hid_pico.ino`：Pico 版主触摸板到鼠标实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、平滑/加速、双击、INT 触发读取、冷启动使能时序）。
+- `sketches/touchpad_hid_nrf/touchpad_hid_nrf.ino`：NRF 版占位草图（待接入 BLE HID 与 Pico 版逻辑）。
 - `sketches/two_finger_tuning/two_finger_tuning.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
 - `sketches/hid_report_dump/hid_report_dump.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
 - `sketches/try_read_data/try_read_data.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。

@@ -8,10 +8,10 @@
 - 使能引脚：`TP_EN=GP9`
 - 设备 I2C 地址：`0x2C`
 
-如需修改引脚或地址，编辑 `sketches/touchpad_hid/touchpad_hid.ino` 顶部的宏定义。
+如需修改引脚或地址，编辑 `sketches/touchpad_hid_pico/touchpad_hid_pico.ino` 顶部的宏定义。
 
 ## 烧录步骤
-1. 在 Arduino IDE 中打开 `sketches/touchpad_hid/touchpad_hid.ino`。
+1. 在 Arduino IDE 中打开 `sketches/touchpad_hid_pico/touchpad_hid_pico.ino`。
 2. 选择板卡与串口。
 3. 点击 **Upload** 上传固件。
 
@@ -134,5 +134,22 @@ tools/ui/run_ui.sh
 
 如果需要双击启动，可使用：
 - `tools/ui/touchpad_config.desktop`
+
+## 串口权限（Linux）
+首次在新机器连接时，可能遇到 `/dev/ttyACM0` 权限不足。可添加 udev 规则并加入 `dialout` 组：
+```
+sudo tee /etc/udev/rules.d/99-adafruit-pico.rules >/dev/null <<'EOF'
+SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", ATTRS{idProduct}=="cafe", MODE="0660", GROUP="dialout"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+确认当前用户在 `dialout` 组，不在则加入并注销/重登：
+```
+groups
+sudo usermod -aG dialout $USER
+```
 
 修改后重新编译上传即可生效。
