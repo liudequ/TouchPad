@@ -2,6 +2,10 @@
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
 #include <bluefruit.h>
+#if defined(ARDUINO_ARCH_NRF52)
+#include <nrf.h>
+#include <nrf_gpio.h>
+#endif
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -14,6 +18,7 @@
 #define TP_EN 9  // ★ 新增：TouchPad ENABLE
 
 uint8_t reportBuf[128];
+const unsigned long IDLE_SLEEP_MS = 60000;
 
 // Minimal HID keycodes used by defaults, defined here to avoid core-specific headers.
 #ifndef KEYBOARD_MODIFIER_LEFTALT
@@ -38,6 +43,10 @@ using namespace Adafruit_LittleFS;
 
 void onConnect(uint16_t conn_handle);
 void onDisconnect(uint16_t conn_handle, uint8_t reason);
+
+#if defined(ARDUINO_ARCH_NRF52)
+extern const uint32_t g_ADigitalPinMap[];
+#endif
 
 class MultiPrint : public Print {
  public:
@@ -108,6 +117,7 @@ int16_t lastX1 = 0, lastY1 = 0;
 int16_t lastX2 = 0, lastY2 = 0;
 unsigned long lastTouchTime = 0;
 unsigned long lastSwipeTime = 0;
+unsigned long lastActivityMs = 0;
 
 int16_t tripleStartX = 0;
 int16_t tripleStartY = 0;
@@ -239,6 +249,24 @@ void initBle() {
   startAdv();
 }
 
+void enterDeepSleep() {
+#if defined(ARDUINO_ARCH_NRF52)
+  if (Bluefruit.connected()) {
+    Bluefruit.disconnect(0);
+    delay(200);
+  }
+  Bluefruit.Advertising.stop();
+
+  uint32_t wake_pin = g_ADigitalPinMap[INT_PIN];
+  nrf_gpio_cfg_sense_input(wake_pin, NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_SENSE_LOW);
+  delay(5);
+  NRF_POWER->SYSTEMOFF = 1;
+  while (true) {
+    __WFE();
+  }
+#endif
+}
+
 void onConnect(uint16_t conn_handle) {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   if (connection) {
@@ -273,6 +301,7 @@ void setup() {
   }
 
   initBle();
+  lastActivityMs = millis();
 }
 
 const char* typeToString(ZoneType type) {
@@ -311,6 +340,9 @@ void loop() {
   handleBleUart();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
+  }
+  if (millis() - lastActivityMs > IDLE_SLEEP_MS) {
+    enterDeepSleep();
   }
 
   unsigned long now = millis();
@@ -1689,6 +1721,7 @@ void readInputReport() {
   for (uint16_t i = 0; i < len; i++) reportBuf[i] = Wire.read();
 
   handleReport(reportBuf, len);
+  lastActivityMs = millis();
 
   waitIntRelease(INT_RELEASE_TIMEOUT_US);
 }
