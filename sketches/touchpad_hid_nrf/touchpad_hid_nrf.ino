@@ -32,12 +32,41 @@ uint8_t reportBuf[128];
 
 BLEDis bledis;
 BLEHidAdafruit blehid;
+BLEUart bleuart;
 
 using namespace Adafruit_LittleFS;
 
 void onConnect(uint16_t conn_handle);
 void onDisconnect(uint16_t conn_handle, uint8_t reason);
 
+class MultiPrint : public Print {
+ public:
+  MultiPrint(Print* primary, Print* secondary) : primary_(primary), secondary_(secondary) {}
+
+  void set(Print* primary, Print* secondary) {
+    primary_ = primary;
+    secondary_ = secondary;
+  }
+
+  size_t write(uint8_t c) override {
+    if (primary_) primary_->write(c);
+    if (secondary_) secondary_->write(c);
+    return 1;
+  }
+
+  size_t write(const uint8_t* buffer, size_t size) override {
+    if (primary_) primary_->write(buffer, size);
+    if (secondary_) secondary_->write(buffer, size);
+    return size;
+  }
+
+ private:
+  Print* primary_;
+  Print* secondary_;
+};
+
+static Print* cfgOut = &Serial;
+static MultiPrint bleOut(&Serial, &bleuart);
 /*===== 参数配置区 =====*/
 // 单指移动
 float sensitivity = 0.35f;
@@ -183,6 +212,7 @@ void startAdv() {
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_MOUSE);
   Bluefruit.Advertising.addService(blehid);
+  Bluefruit.Advertising.addService(bleuart);
   Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.restartOnDisconnect(true);
@@ -205,6 +235,7 @@ void initBle() {
   bledis.begin();
 
   blehid.begin();
+  bleuart.begin();
   startAdv();
 }
 
@@ -277,6 +308,7 @@ bool parseType(const String& value, ZoneType* out) {
    ===========================*/
 void loop() {
   handleSerial();
+  handleBleUart();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
@@ -340,7 +372,26 @@ void handleSerial() {
     if (c == '\n') {
       line.trim();
       if (line.length() > 0) {
+        cfgOut = &Serial;
         processCommand(line);
+      }
+      line = "";
+    } else if (c != '\r') {
+      line += c;
+    }
+  }
+}
+
+void handleBleUart() {
+  static String line;
+  while (bleuart.available()) {
+    char c = (char)bleuart.read();
+    if (c == '\n') {
+      line.trim();
+      if (line.length() > 0) {
+        cfgOut = &bleOut;
+        processCommand(line);
+        cfgOut = &Serial;
       }
       line = "";
     } else if (c != '\r') {
@@ -351,96 +402,96 @@ void handleSerial() {
 
 void processCommand(const String& line) {
   if (line.equalsIgnoreCase("HELP")) {
-    Serial.println("CMD: GET scrollSensitivity");
-    Serial.println("CMD: GET");
-    Serial.println("CMD: SET <key> <value>");
-    Serial.println("CMD: SAVE");
-    Serial.println("CMD: LOAD");
-    Serial.println("CMD: RESET");
+    cfgOut->println("CMD: GET scrollSensitivity");
+    cfgOut->println("CMD: GET");
+    cfgOut->println("CMD: SET <key> <value>");
+    cfgOut->println("CMD: SAVE");
+    cfgOut->println("CMD: LOAD");
+    cfgOut->println("CMD: RESET");
     return;
   }
 
   if (line.equalsIgnoreCase("GET")) {
-    Serial.print("scrollSensitivity=");
-    Serial.println(scrollSensitivity, 8);
-    Serial.print("topZonePercent=");
-    Serial.println(TOP_ZONE_PERCENT);
-    Serial.print("sideZonePercent=");
-    Serial.println(SIDE_ZONE_PERCENT);
-    Serial.print("enableNavZones=");
-    Serial.println(enableNavZones ? "1" : "0");
-    Serial.print("leftTopType=");
-    Serial.println(typeToString(leftTopZone.type));
-    Serial.print("leftTopButtons=");
-    Serial.println(leftTopZone.mouseButtons);
-    Serial.print("leftTopModifier=");
-    Serial.println(leftTopZone.keyModifier);
-    Serial.print("leftTopKey=");
-    Serial.println(leftTopZone.keyCode);
-    Serial.print("rightTopType=");
-    Serial.println(typeToString(rightTopZone.type));
-    Serial.print("rightTopButtons=");
-    Serial.println(rightTopZone.mouseButtons);
-    Serial.print("rightTopModifier=");
-    Serial.println(rightTopZone.keyModifier);
-    Serial.print("rightTopKey=");
-    Serial.println(rightTopZone.keyCode);
-    Serial.print("rightBottomType=");
-    Serial.println(typeToString(rightBottomZone.type));
-    Serial.print("rightBottomButtons=");
-    Serial.println(rightBottomZone.mouseButtons);
-    Serial.print("rightBottomModifier=");
-    Serial.println(rightBottomZone.keyModifier);
-    Serial.print("rightBottomKey=");
-    Serial.println(rightBottomZone.keyCode);
-    Serial.print("leftBottomType=");
-    Serial.println(typeToString(leftBottomZone.type));
-    Serial.print("leftBottomButtons=");
-    Serial.println(leftBottomZone.mouseButtons);
-    Serial.print("leftBottomModifier=");
-    Serial.println(leftBottomZone.keyModifier);
-    Serial.print("leftBottomKey=");
-    Serial.println(leftBottomZone.keyCode);
-    Serial.print("threeLeftType=");
-    Serial.println(typeToString(threeLeftBinding.type));
-    Serial.print("threeLeftButtons=");
-    Serial.println(threeLeftBinding.mouseButtons);
-    Serial.print("threeLeftModifier=");
-    Serial.println(threeLeftBinding.keyModifier);
-    Serial.print("threeLeftKey=");
-    Serial.println(threeLeftBinding.keyCode);
-    Serial.print("threeRightType=");
-    Serial.println(typeToString(threeRightBinding.type));
-    Serial.print("threeRightButtons=");
-    Serial.println(threeRightBinding.mouseButtons);
-    Serial.print("threeRightModifier=");
-    Serial.println(threeRightBinding.keyModifier);
-    Serial.print("threeRightKey=");
-    Serial.println(threeRightBinding.keyCode);
-    Serial.print("threeUpType=");
-    Serial.println(typeToString(threeUpBinding.type));
-    Serial.print("threeUpButtons=");
-    Serial.println(threeUpBinding.mouseButtons);
-    Serial.print("threeUpModifier=");
-    Serial.println(threeUpBinding.keyModifier);
-    Serial.print("threeUpKey=");
-    Serial.println(threeUpBinding.keyCode);
-    Serial.print("threeDownType=");
-    Serial.println(typeToString(threeDownBinding.type));
-    Serial.print("threeDownButtons=");
-    Serial.println(threeDownBinding.mouseButtons);
-    Serial.print("threeDownModifier=");
-    Serial.println(threeDownBinding.keyModifier);
-    Serial.print("threeDownKey=");
-    Serial.println(threeDownBinding.keyCode);
-    Serial.print("threeSwipeThresholdX=");
-    Serial.println(threeSwipeThresholdX);
-    Serial.print("threeSwipeThresholdY=");
-    Serial.println(threeSwipeThresholdY);
-    Serial.print("threeSwipeTimeout=");
-    Serial.println(threeSwipeTimeout);
-    Serial.print("threeSwipeCooldown=");
-    Serial.println(threeSwipeCooldown);
+    cfgOut->print("scrollSensitivity=");
+    cfgOut->println(scrollSensitivity, 8);
+    cfgOut->print("topZonePercent=");
+    cfgOut->println(TOP_ZONE_PERCENT);
+    cfgOut->print("sideZonePercent=");
+    cfgOut->println(SIDE_ZONE_PERCENT);
+    cfgOut->print("enableNavZones=");
+    cfgOut->println(enableNavZones ? "1" : "0");
+    cfgOut->print("leftTopType=");
+    cfgOut->println(typeToString(leftTopZone.type));
+    cfgOut->print("leftTopButtons=");
+    cfgOut->println(leftTopZone.mouseButtons);
+    cfgOut->print("leftTopModifier=");
+    cfgOut->println(leftTopZone.keyModifier);
+    cfgOut->print("leftTopKey=");
+    cfgOut->println(leftTopZone.keyCode);
+    cfgOut->print("rightTopType=");
+    cfgOut->println(typeToString(rightTopZone.type));
+    cfgOut->print("rightTopButtons=");
+    cfgOut->println(rightTopZone.mouseButtons);
+    cfgOut->print("rightTopModifier=");
+    cfgOut->println(rightTopZone.keyModifier);
+    cfgOut->print("rightTopKey=");
+    cfgOut->println(rightTopZone.keyCode);
+    cfgOut->print("rightBottomType=");
+    cfgOut->println(typeToString(rightBottomZone.type));
+    cfgOut->print("rightBottomButtons=");
+    cfgOut->println(rightBottomZone.mouseButtons);
+    cfgOut->print("rightBottomModifier=");
+    cfgOut->println(rightBottomZone.keyModifier);
+    cfgOut->print("rightBottomKey=");
+    cfgOut->println(rightBottomZone.keyCode);
+    cfgOut->print("leftBottomType=");
+    cfgOut->println(typeToString(leftBottomZone.type));
+    cfgOut->print("leftBottomButtons=");
+    cfgOut->println(leftBottomZone.mouseButtons);
+    cfgOut->print("leftBottomModifier=");
+    cfgOut->println(leftBottomZone.keyModifier);
+    cfgOut->print("leftBottomKey=");
+    cfgOut->println(leftBottomZone.keyCode);
+    cfgOut->print("threeLeftType=");
+    cfgOut->println(typeToString(threeLeftBinding.type));
+    cfgOut->print("threeLeftButtons=");
+    cfgOut->println(threeLeftBinding.mouseButtons);
+    cfgOut->print("threeLeftModifier=");
+    cfgOut->println(threeLeftBinding.keyModifier);
+    cfgOut->print("threeLeftKey=");
+    cfgOut->println(threeLeftBinding.keyCode);
+    cfgOut->print("threeRightType=");
+    cfgOut->println(typeToString(threeRightBinding.type));
+    cfgOut->print("threeRightButtons=");
+    cfgOut->println(threeRightBinding.mouseButtons);
+    cfgOut->print("threeRightModifier=");
+    cfgOut->println(threeRightBinding.keyModifier);
+    cfgOut->print("threeRightKey=");
+    cfgOut->println(threeRightBinding.keyCode);
+    cfgOut->print("threeUpType=");
+    cfgOut->println(typeToString(threeUpBinding.type));
+    cfgOut->print("threeUpButtons=");
+    cfgOut->println(threeUpBinding.mouseButtons);
+    cfgOut->print("threeUpModifier=");
+    cfgOut->println(threeUpBinding.keyModifier);
+    cfgOut->print("threeUpKey=");
+    cfgOut->println(threeUpBinding.keyCode);
+    cfgOut->print("threeDownType=");
+    cfgOut->println(typeToString(threeDownBinding.type));
+    cfgOut->print("threeDownButtons=");
+    cfgOut->println(threeDownBinding.mouseButtons);
+    cfgOut->print("threeDownModifier=");
+    cfgOut->println(threeDownBinding.keyModifier);
+    cfgOut->print("threeDownKey=");
+    cfgOut->println(threeDownBinding.keyCode);
+    cfgOut->print("threeSwipeThresholdX=");
+    cfgOut->println(threeSwipeThresholdX);
+    cfgOut->print("threeSwipeThresholdY=");
+    cfgOut->println(threeSwipeThresholdY);
+    cfgOut->print("threeSwipeTimeout=");
+    cfgOut->println(threeSwipeTimeout);
+    cfgOut->print("threeSwipeCooldown=");
+    cfgOut->println(threeSwipeCooldown);
     return;
   }
 
@@ -448,213 +499,213 @@ void processCommand(const String& line) {
     String key = line.substring(4);
     key.trim();
     if (key.equalsIgnoreCase("scrollSensitivity")) {
-      Serial.print("scrollSensitivity=");
-      Serial.println(scrollSensitivity, 8);
+      cfgOut->print("scrollSensitivity=");
+      cfgOut->println(scrollSensitivity, 8);
       return;
     }
     if (key.equalsIgnoreCase("topZonePercent")) {
-      Serial.print("topZonePercent=");
-      Serial.println(TOP_ZONE_PERCENT);
+      cfgOut->print("topZonePercent=");
+      cfgOut->println(TOP_ZONE_PERCENT);
       return;
     }
     if (key.equalsIgnoreCase("sideZonePercent")) {
-      Serial.print("sideZonePercent=");
-      Serial.println(SIDE_ZONE_PERCENT);
+      cfgOut->print("sideZonePercent=");
+      cfgOut->println(SIDE_ZONE_PERCENT);
       return;
     }
     if (key.equalsIgnoreCase("enableNavZones")) {
-      Serial.print("enableNavZones=");
-      Serial.println(enableNavZones ? "1" : "0");
+      cfgOut->print("enableNavZones=");
+      cfgOut->println(enableNavZones ? "1" : "0");
       return;
     }
     if (key.equalsIgnoreCase("leftTopType")) {
-      Serial.print("leftTopType=");
-      Serial.println(typeToString(leftTopZone.type));
+      cfgOut->print("leftTopType=");
+      cfgOut->println(typeToString(leftTopZone.type));
       return;
     }
     if (key.equalsIgnoreCase("leftTopButtons")) {
-      Serial.print("leftTopButtons=");
-      Serial.println(leftTopZone.mouseButtons);
+      cfgOut->print("leftTopButtons=");
+      cfgOut->println(leftTopZone.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("leftTopModifier")) {
-      Serial.print("leftTopModifier=");
-      Serial.println(leftTopZone.keyModifier);
+      cfgOut->print("leftTopModifier=");
+      cfgOut->println(leftTopZone.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("leftTopKey")) {
-      Serial.print("leftTopKey=");
-      Serial.println(leftTopZone.keyCode);
+      cfgOut->print("leftTopKey=");
+      cfgOut->println(leftTopZone.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("rightTopType")) {
-      Serial.print("rightTopType=");
-      Serial.println(typeToString(rightTopZone.type));
+      cfgOut->print("rightTopType=");
+      cfgOut->println(typeToString(rightTopZone.type));
       return;
     }
     if (key.equalsIgnoreCase("rightTopButtons")) {
-      Serial.print("rightTopButtons=");
-      Serial.println(rightTopZone.mouseButtons);
+      cfgOut->print("rightTopButtons=");
+      cfgOut->println(rightTopZone.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("rightTopModifier")) {
-      Serial.print("rightTopModifier=");
-      Serial.println(rightTopZone.keyModifier);
+      cfgOut->print("rightTopModifier=");
+      cfgOut->println(rightTopZone.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("rightTopKey")) {
-      Serial.print("rightTopKey=");
-      Serial.println(rightTopZone.keyCode);
+      cfgOut->print("rightTopKey=");
+      cfgOut->println(rightTopZone.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("rightBottomType")) {
-      Serial.print("rightBottomType=");
-      Serial.println(typeToString(rightBottomZone.type));
+      cfgOut->print("rightBottomType=");
+      cfgOut->println(typeToString(rightBottomZone.type));
       return;
     }
     if (key.equalsIgnoreCase("rightBottomButtons")) {
-      Serial.print("rightBottomButtons=");
-      Serial.println(rightBottomZone.mouseButtons);
+      cfgOut->print("rightBottomButtons=");
+      cfgOut->println(rightBottomZone.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("rightBottomModifier")) {
-      Serial.print("rightBottomModifier=");
-      Serial.println(rightBottomZone.keyModifier);
+      cfgOut->print("rightBottomModifier=");
+      cfgOut->println(rightBottomZone.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("rightBottomKey")) {
-      Serial.print("rightBottomKey=");
-      Serial.println(rightBottomZone.keyCode);
+      cfgOut->print("rightBottomKey=");
+      cfgOut->println(rightBottomZone.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("leftBottomType")) {
-      Serial.print("leftBottomType=");
-      Serial.println(typeToString(leftBottomZone.type));
+      cfgOut->print("leftBottomType=");
+      cfgOut->println(typeToString(leftBottomZone.type));
       return;
     }
     if (key.equalsIgnoreCase("leftBottomButtons")) {
-      Serial.print("leftBottomButtons=");
-      Serial.println(leftBottomZone.mouseButtons);
+      cfgOut->print("leftBottomButtons=");
+      cfgOut->println(leftBottomZone.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("leftBottomModifier")) {
-      Serial.print("leftBottomModifier=");
-      Serial.println(leftBottomZone.keyModifier);
+      cfgOut->print("leftBottomModifier=");
+      cfgOut->println(leftBottomZone.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("leftBottomKey")) {
-      Serial.print("leftBottomKey=");
-      Serial.println(leftBottomZone.keyCode);
+      cfgOut->print("leftBottomKey=");
+      cfgOut->println(leftBottomZone.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("threeLeftType")) {
-      Serial.print("threeLeftType=");
-      Serial.println(typeToString(threeLeftBinding.type));
+      cfgOut->print("threeLeftType=");
+      cfgOut->println(typeToString(threeLeftBinding.type));
       return;
     }
     if (key.equalsIgnoreCase("threeLeftButtons")) {
-      Serial.print("threeLeftButtons=");
-      Serial.println(threeLeftBinding.mouseButtons);
+      cfgOut->print("threeLeftButtons=");
+      cfgOut->println(threeLeftBinding.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("threeLeftModifier")) {
-      Serial.print("threeLeftModifier=");
-      Serial.println(threeLeftBinding.keyModifier);
+      cfgOut->print("threeLeftModifier=");
+      cfgOut->println(threeLeftBinding.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("threeLeftKey")) {
-      Serial.print("threeLeftKey=");
-      Serial.println(threeLeftBinding.keyCode);
+      cfgOut->print("threeLeftKey=");
+      cfgOut->println(threeLeftBinding.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("threeRightType")) {
-      Serial.print("threeRightType=");
-      Serial.println(typeToString(threeRightBinding.type));
+      cfgOut->print("threeRightType=");
+      cfgOut->println(typeToString(threeRightBinding.type));
       return;
     }
     if (key.equalsIgnoreCase("threeRightButtons")) {
-      Serial.print("threeRightButtons=");
-      Serial.println(threeRightBinding.mouseButtons);
+      cfgOut->print("threeRightButtons=");
+      cfgOut->println(threeRightBinding.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("threeRightModifier")) {
-      Serial.print("threeRightModifier=");
-      Serial.println(threeRightBinding.keyModifier);
+      cfgOut->print("threeRightModifier=");
+      cfgOut->println(threeRightBinding.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("threeRightKey")) {
-      Serial.print("threeRightKey=");
-      Serial.println(threeRightBinding.keyCode);
+      cfgOut->print("threeRightKey=");
+      cfgOut->println(threeRightBinding.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("threeUpType")) {
-      Serial.print("threeUpType=");
-      Serial.println(typeToString(threeUpBinding.type));
+      cfgOut->print("threeUpType=");
+      cfgOut->println(typeToString(threeUpBinding.type));
       return;
     }
     if (key.equalsIgnoreCase("threeUpButtons")) {
-      Serial.print("threeUpButtons=");
-      Serial.println(threeUpBinding.mouseButtons);
+      cfgOut->print("threeUpButtons=");
+      cfgOut->println(threeUpBinding.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("threeUpModifier")) {
-      Serial.print("threeUpModifier=");
-      Serial.println(threeUpBinding.keyModifier);
+      cfgOut->print("threeUpModifier=");
+      cfgOut->println(threeUpBinding.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("threeUpKey")) {
-      Serial.print("threeUpKey=");
-      Serial.println(threeUpBinding.keyCode);
+      cfgOut->print("threeUpKey=");
+      cfgOut->println(threeUpBinding.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("threeDownType")) {
-      Serial.print("threeDownType=");
-      Serial.println(typeToString(threeDownBinding.type));
+      cfgOut->print("threeDownType=");
+      cfgOut->println(typeToString(threeDownBinding.type));
       return;
     }
     if (key.equalsIgnoreCase("threeDownButtons")) {
-      Serial.print("threeDownButtons=");
-      Serial.println(threeDownBinding.mouseButtons);
+      cfgOut->print("threeDownButtons=");
+      cfgOut->println(threeDownBinding.mouseButtons);
       return;
     }
     if (key.equalsIgnoreCase("threeDownModifier")) {
-      Serial.print("threeDownModifier=");
-      Serial.println(threeDownBinding.keyModifier);
+      cfgOut->print("threeDownModifier=");
+      cfgOut->println(threeDownBinding.keyModifier);
       return;
     }
     if (key.equalsIgnoreCase("threeDownKey")) {
-      Serial.print("threeDownKey=");
-      Serial.println(threeDownBinding.keyCode);
+      cfgOut->print("threeDownKey=");
+      cfgOut->println(threeDownBinding.keyCode);
       return;
     }
     if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
-      Serial.print("threeSwipeThresholdX=");
-      Serial.println(threeSwipeThresholdX);
+      cfgOut->print("threeSwipeThresholdX=");
+      cfgOut->println(threeSwipeThresholdX);
       return;
     }
     if (key.equalsIgnoreCase("threeSwipeThresholdY")) {
-      Serial.print("threeSwipeThresholdY=");
-      Serial.println(threeSwipeThresholdY);
+      cfgOut->print("threeSwipeThresholdY=");
+      cfgOut->println(threeSwipeThresholdY);
       return;
     }
     if (key.equalsIgnoreCase("threeSwipeTimeout")) {
-      Serial.print("threeSwipeTimeout=");
-      Serial.println(threeSwipeTimeout);
+      cfgOut->print("threeSwipeTimeout=");
+      cfgOut->println(threeSwipeTimeout);
       return;
     }
     if (key.equalsIgnoreCase("threeSwipeCooldown")) {
-      Serial.print("threeSwipeCooldown=");
-      Serial.println(threeSwipeCooldown);
+      cfgOut->print("threeSwipeCooldown=");
+      cfgOut->println(threeSwipeCooldown);
       return;
     }
-    Serial.println("ERR: key");
+    cfgOut->println("ERR: key");
     return;
   }
 
   if (line.startsWith("SET ")) {
     int keyEnd = line.indexOf(' ', 4);
     if (keyEnd < 0) {
-      Serial.println("ERR: SET format");
+      cfgOut->println("ERR: SET format");
       return;
     }
     String key = line.substring(4, keyEnd);
@@ -664,9 +715,9 @@ void processCommand(const String& line) {
       float v = valueStr.toFloat();
       if (v > 0.0f) {
         scrollSensitivity = v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -674,9 +725,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 5 && v <= 50) {
         TOP_ZONE_PERCENT = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -684,21 +735,21 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 5 && v <= 50) {
         SIDE_ZONE_PERCENT = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
     if (key.equalsIgnoreCase("enableNavZones")) {
       if (valueStr.equalsIgnoreCase("1") || valueStr.equalsIgnoreCase("true")) {
         enableNavZones = true;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
         enableNavZones = false;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -706,9 +757,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         leftTopZone.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -716,9 +767,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         leftTopZone.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -726,9 +777,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         leftTopZone.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -736,9 +787,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         leftTopZone.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -746,9 +797,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         rightTopZone.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -756,9 +807,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         rightTopZone.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -766,9 +817,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         rightTopZone.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -776,9 +827,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         rightTopZone.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -786,9 +837,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         rightBottomZone.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -796,9 +847,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         rightBottomZone.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -806,9 +857,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         rightBottomZone.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -816,9 +867,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         rightBottomZone.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -826,9 +877,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         leftBottomZone.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -836,9 +887,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         leftBottomZone.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -846,9 +897,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         leftBottomZone.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -856,9 +907,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         leftBottomZone.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -866,9 +917,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         threeLeftBinding.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -876,9 +927,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         threeLeftBinding.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -886,9 +937,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeLeftBinding.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -896,9 +947,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeLeftBinding.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -906,9 +957,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         threeRightBinding.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -916,9 +967,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         threeRightBinding.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -926,9 +977,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeRightBinding.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -936,9 +987,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeRightBinding.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -946,9 +997,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         threeUpBinding.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -956,9 +1007,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         threeUpBinding.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -966,9 +1017,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeUpBinding.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -976,9 +1027,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeUpBinding.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -986,9 +1037,9 @@ void processCommand(const String& line) {
       ZoneType type;
       if (parseType(valueStr, &type)) {
         threeDownBinding.type = type;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -996,9 +1047,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 7) {
         threeDownBinding.mouseButtons = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1006,9 +1057,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeDownBinding.keyModifier = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1016,9 +1067,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 255) {
         threeDownBinding.keyCode = (uint8_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1026,9 +1077,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 50 && v <= 800) {
         threeSwipeThresholdX = (uint16_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1036,9 +1087,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 50 && v <= 800) {
         threeSwipeThresholdY = (uint16_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1046,9 +1097,9 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 50 && v <= 1000) {
         threeSwipeTimeout = (uint16_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
@@ -1056,47 +1107,47 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 2000) {
         threeSwipeCooldown = (uint16_t)v;
-        Serial.println("OK");
+        cfgOut->println("OK");
       } else {
-        Serial.println("ERR: value");
+        cfgOut->println("ERR: value");
       }
       return;
     }
-    Serial.println("ERR: key");
+    cfgOut->println("ERR: key");
     return;
   }
 
   if (line.equalsIgnoreCase("SAVE")) {
     if (saveConfig()) {
-      Serial.println("OK");
+      cfgOut->println("OK");
     } else {
-      Serial.println("ERR: save");
+      cfgOut->println("ERR: save");
     }
     return;
   }
 
   if (line.equalsIgnoreCase("LOAD")) {
     if (loadConfig()) {
-      Serial.println("OK");
+      cfgOut->println("OK");
     } else {
-      Serial.println("ERR: load");
+      cfgOut->println("ERR: load");
     }
     return;
   }
 
   if (line.equalsIgnoreCase("RESET")) {
     applyDefaults();
-    Serial.println("OK");
+    cfgOut->println("OK");
     return;
   }
 
-  Serial.println("ERR: unknown");
+  cfgOut->println("ERR: unknown");
 }
 
 bool loadConfig() {
   File f(InternalFS);
   if (!f.open(CONFIG_PATH, FILE_O_READ)) {
-    Serial.println("[cfg] no config");
+    cfgOut->println("[cfg] no config");
     return false;
   }
   while (f.available()) {
@@ -1237,7 +1288,7 @@ bool loadConfig() {
 bool saveConfig() {
   File f(InternalFS);
   if (!f.open(CONFIG_PATH, FILE_O_WRITE | FILE_O_CREAT | FILE_O_TRUNC)) {
-    Serial.println("[cfg] open failed");
+    cfgOut->println("[cfg] open failed");
     return false;
   }
   f.print("scrollSensitivity=");
