@@ -148,6 +148,11 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         conn_layout.addWidget(self.status_label)
         layout.addWidget(conn_group)
 
+        self.ble_hint = QtWidgets.QLabel("BLE 需先在系统蓝牙中配对，再回到此处连接。")
+        self.ble_hint.setWordWrap(True)
+        self.ble_hint.setVisible(False)
+        layout.addWidget(self.ble_hint)
+
         scroll_area = QtWidgets.QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -319,6 +324,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.status_label.setText("未连接")
             self.connect_btn.setText("连接")
             self.client = None
+        self.ble_hint.setVisible(self.conn_type_combo.currentText() == "BLE")
         self._refresh_targets()
 
     def _toggle_connection(self):
