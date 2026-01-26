@@ -35,6 +35,9 @@ BLEHidAdafruit blehid;
 
 using namespace Adafruit_LittleFS;
 
+void onConnect(uint16_t conn_handle);
+void onDisconnect(uint16_t conn_handle, uint8_t reason);
+
 /*===== 参数配置区 =====*/
 // 单指移动
 float sensitivity = 0.35f;
@@ -180,6 +183,8 @@ void startAdv() {
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_MOUSE);
   Bluefruit.Advertising.addService(blehid);
+  Bluefruit.Advertising.setInterval(32, 244);
+  Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.start(0);
 }
@@ -188,6 +193,12 @@ void initBle() {
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName("TouchPad");
+  Bluefruit.autoConnLed(true);
+
+  Bluefruit.Periph.setConnectCallback(onConnect);
+  Bluefruit.Periph.setDisconnectCallback(onDisconnect);
+  Bluefruit.Security.setBonding(true);
+  Bluefruit.Security.setIOCaps(BLE_GAP_IO_CAPS_NONE);
 
   bledis.setManufacturer("TouchPad");
   bledis.setModel("NRF52840");
@@ -195,6 +206,20 @@ void initBle() {
 
   blehid.begin();
   startAdv();
+}
+
+void onConnect(uint16_t conn_handle) {
+  BLEConnection* connection = Bluefruit.Connection(conn_handle);
+  if (connection) {
+    connection->requestConnectionParameter(6, 12, 0, 200);
+  }
+  Serial.println("[ble] connected");
+}
+
+void onDisconnect(uint16_t conn_handle, uint8_t reason) {
+  (void)conn_handle;
+  (void)reason;
+  Serial.println("[ble] disconnected");
 }
 
 void setup() {
