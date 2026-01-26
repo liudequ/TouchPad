@@ -14,4 +14,5 @@ fi
 # shellcheck disable=SC1091
 . ".venv/bin/activate"
 
+python -m pip install -r "tools/ui/requirements.txt"
 python "tools/ui/touchpad_config_ui.py"
