@@ -5,6 +5,14 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from serial_client import SerialClient
 
+try:
+    from ble_client import BleClient
+except Exception as exc:
+    BleClient = None
+    BLE_IMPORT_ERROR = exc
+else:
+    BLE_IMPORT_ERROR = None
+
 
 ZONE_TYPES = ["NONE", "MOUSE", "KEYBOARD"]
 HID_KEY_MAP = {
@@ -116,19 +124,24 @@ class TouchpadConfigUI(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("触摸板配置")
-        self.client = SerialClient()
+        self.serial_client = SerialClient()
+        self.ble_client = BleClient() if BleClient else None
+        self.client = None
         self._build_ui()
-        self._refresh_ports()
+        self._refresh_targets()
 
     def _build_ui(self):
         layout = QtWidgets.QVBoxLayout(self)
 
         conn_group = QtWidgets.QGroupBox("连接")
         conn_layout = QtWidgets.QHBoxLayout(conn_group)
+        self.conn_type_combo = QtWidgets.QComboBox()
+        self.conn_type_combo.addItems(["USB串口", "BLE"])
         self.port_combo = QtWidgets.QComboBox()
         self.refresh_btn = QtWidgets.QPushButton("刷新")
         self.connect_btn = QtWidgets.QPushButton("连接")
         self.status_label = QtWidgets.QLabel("未连接")
+        conn_layout.addWidget(self.conn_type_combo)
         conn_layout.addWidget(self.port_combo)
         conn_layout.addWidget(self.refresh_btn)
         conn_layout.addWidget(self.connect_btn)
@@ -219,8 +232,9 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.log.setReadOnly(True)
         layout.addWidget(self.log)
 
-        self.refresh_btn.clicked.connect(self._refresh_ports)
+        self.refresh_btn.clicked.connect(self._refresh_targets)
         self.connect_btn.clicked.connect(self._toggle_connection)
+        self.conn_type_combo.currentIndexChanged.connect(self._on_conn_type_changed)
         self.apply_btn.clicked.connect(self._apply)
         self.refresh_values_btn.clicked.connect(self._refresh_values)
         self.save_btn.clicked.connect(self._save)
@@ -270,28 +284,65 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._update_key_display(widgets)
         dialog.accept()
 
-    def _refresh_ports(self):
-        ports = SerialClient.list_ports()
+    def _current_client(self):
+        if self.conn_type_combo.currentText() == "BLE":
+            return self.ble_client
+        return self.serial_client
+
+    def _refresh_targets(self):
         self.port_combo.clear()
-        self.port_combo.addItems(ports)
-        if not ports:
-            self.status_label.setText("无串口")
+        if self.conn_type_combo.currentText() == "BLE":
+            if not self.ble_client:
+                self.status_label.setText("BLE不可用")
+                if BLE_IMPORT_ERROR:
+                    self._log(f"BLE初始化失败：{BLE_IMPORT_ERROR}")
+                return
+            try:
+                devices = self.ble_client.list_devices()
+            except Exception as exc:
+                self._log(f"扫描失败：{exc}")
+                self.status_label.setText("扫描失败")
+                return
+            for label, address in devices:
+                self.port_combo.addItem(label, address)
+            if not devices:
+                self.status_label.setText("无BLE设备")
+        else:
+            ports = SerialClient.list_ports()
+            self.port_combo.addItems(ports)
+            if not ports:
+                self.status_label.setText("无串口")
+
+    def _on_conn_type_changed(self):
+        if self.client and self.client.is_connected():
+            self.client.disconnect()
+            self.status_label.setText("未连接")
+            self.connect_btn.setText("连接")
+            self.client = None
+        self._refresh_targets()
 
     def _toggle_connection(self):
-        if self.client.is_connected():
+        if self.client and self.client.is_connected():
             self.client.disconnect()
             self.status_label.setText("未连接")
             self.connect_btn.setText("连接")
             return
-        port = self.port_combo.currentText()
-        if not port:
-            self._log("未选择串口")
+        target = self.port_combo.currentData()
+        if not target:
+            target = self.port_combo.currentText()
+        if not target:
+            self._log("未选择设备")
+            return
+        client = self._current_client()
+        if not client:
+            self._log("连接方式不可用")
             return
         try:
-            self.client.connect(port)
+            client.connect(target)
         except Exception as exc:
             self._log(f"连接失败：{exc}")
             return
+        self.client = client
         self.status_label.setText("已连接")
         self.connect_btn.setText("断开")
         self._refresh_values()
@@ -300,7 +351,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.log.appendPlainText(text)
 
     def _refresh_values(self):
-        if not self.client.is_connected():
+        if not self.client or not self.client.is_connected():
             self._log("未连接")
             return
         data = self.client.get_all()
@@ -382,7 +433,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._update_key_display(widgets)
 
     def _apply(self):
-        if not self.client.is_connected():
+        if not self.client or not self.client.is_connected():
             self._log("未连接")
             return
         cmds = [
@@ -419,7 +470,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._refresh_values()
 
     def _simple_cmd(self, cmd):
-        if not self.client.is_connected():
+        if not self.client or not self.client.is_connected():
             self._log("未连接")
             return
         for line in self.client.send(cmd):
