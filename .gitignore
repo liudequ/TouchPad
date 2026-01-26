@@ -23,6 +23,8 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
+__pycache__/
+*.pyc
 
 # AppImages or large binaries
 *.AppImage
