@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <Adafruit_TinyUSB.h>
 #include <LittleFS.h>
+#include <pico/bootrom.h>
 
 /*===== I2C-HID =====*/
 #define I2C_ADDR 0x2C
@@ -25,6 +26,12 @@ uint8_t const hid_report_descriptor[] = {
   TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
   TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD))
 };
+
+void rebootToBootsel() {
+  Serial.println("[sys] reboot to BOOTSEL");
+  delay(20);
+  reset_usb_boot(0, 0);
+}
 
 /*===== 参数配置区 =====*/
 // 单指移动
@@ -298,6 +305,7 @@ void processCommand(const String& line) {
     Serial.println("CMD: SAVE");
     Serial.println("CMD: LOAD");
     Serial.println("CMD: RESET");
+    Serial.println("CMD: BOOT");
     return;
   }
 
@@ -1028,6 +1036,12 @@ void processCommand(const String& line) {
   if (line.equalsIgnoreCase("RESET")) {
     applyDefaults();
     Serial.println("OK");
+    return;
+  }
+
+  if (line.equalsIgnoreCase("BOOT")) {
+    Serial.println("OK");
+    rebootToBootsel();
     return;
   }
 
