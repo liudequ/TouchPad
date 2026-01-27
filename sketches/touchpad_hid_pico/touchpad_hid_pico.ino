@@ -1,3 +1,5 @@
+#include "touchpad_types.h"
+
 #include <Wire.h>
 #include <Adafruit_TinyUSB.h>
 #include <LittleFS.h>
@@ -105,19 +107,6 @@ uint8_t TOP_ZONE_PERCENT = 20;
 uint8_t SIDE_ZONE_PERCENT = 35;
 
 bool enableNavZones = true;
-
-enum ZoneType {
-  ZONE_NONE = 0,
-  ZONE_MOUSE = 1,
-  ZONE_KEYBOARD = 2
-};
-
-struct ZoneBinding {
-  ZoneType type;
-  uint8_t mouseButtons;
-  uint8_t keyModifier;
-  uint8_t keyCode;
-};
 
 ZoneBinding leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
 ZoneBinding rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
@@ -1448,6 +1437,20 @@ void handleReport(uint8_t* buf, uint16_t len) {
       dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
       if (abs(dx) <= MOVE_DEADBAND) dx = 0;
       if (abs(dy) <= MOVE_DEADBAND) dy = 0;
+
+      if (tapCandidate) {
+        uint16_t dist = abs(x1 - tapStartX) + abs(y1 - tapStartY);
+        if (dist <= DOUBLE_TAP_MAX_MOVE) {
+          velX = velY = 0;
+          smoothDx = smoothDy = 0;
+          accumX = accumY = 0;
+          lastX1 = x1;
+          lastY1 = y1;
+          lastTouchTime = now;
+          return;
+        }
+        tapCandidate = false;
+      }
 
       if (dx == 0 && dy == 0) {
         velX = velY = 0;
