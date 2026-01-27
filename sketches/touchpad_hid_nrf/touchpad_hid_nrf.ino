@@ -99,6 +99,7 @@ const unsigned long DOUBLE_TAP_WINDOW = 200;
 const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
+const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -119,6 +120,7 @@ int16_t lastX1 = 0, lastY1 = 0;
 int16_t lastX2 = 0, lastY2 = 0;
 unsigned long lastTouchTime = 0;
 unsigned long lastSwipeTime = 0;
+unsigned long lastScrollTime = 0;
 unsigned long lastActivityMs = 0;
 
 int16_t tripleStartX = 0;
@@ -351,6 +353,7 @@ void loop() {
     scrollVel = 0;
     smoothScroll = 0;
     accumScroll = 0;
+    lastScrollTime = now;
   }
 
   if (mode == MODE_TRIPLE && now - lastTouchTime > RELEASE_TIMEOUT) {
@@ -1555,11 +1558,19 @@ void handleReport(uint8_t* buf, uint16_t len) {
     mode = MODE_DOUBLE;
     tapCandidate = false;
     lastTouchTime = now;
+    lastScrollTime = now;
     return;
   }
 
   /*===== 单指移动 =====*/
   if (f1 && !f2) {
+    if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
+      lastX1 = x1;
+      lastY1 = y1;
+      mode = MODE_SINGLE;
+      lastTouchTime = now;
+      return;
+    }
     if (mode == MODE_SINGLE) {
       int16_t dx = x1 - lastX1;
       int16_t dy = y1 - lastY1;
@@ -1622,6 +1633,12 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
+    if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
+      tapCandidate = false;
+      pendingClick = false;
+      mode = MODE_NONE;
+      return;
+    }
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
       if (dt <= TAP_MAX_MS) {
