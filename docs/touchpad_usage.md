@@ -13,6 +13,7 @@
 ## 烧录步骤
 1. 在 Arduino IDE 中打开 `sketches/touchpad_hid_pico/touchpad_hid_pico.ino`。
 2. 选择板卡与串口。
+3. Tools → Flash Size 选择 `Sketch 1M FS 1M`（用于 LittleFS 配置存储）。
 3. 点击 **Upload** 上传固件。
 
 ## 操作方式
