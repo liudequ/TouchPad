@@ -246,7 +246,7 @@ void loop() {
   }
 
   /*连续输出*/
-  if (mode == MODE_SINGLE) {
+  if (mode == MODE_SINGLE && !tapCandidate) {
     accumX += velX;
     accumY += velY;
     int8_t mx = (int8_t)accumX;

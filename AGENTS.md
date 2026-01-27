@@ -29,6 +29,7 @@
 - 采用标准 Arduino C++ 风格：2 空格缩进、K&R 花括号风格、清晰的函数命名。
 - 变量命名应具描述性，尽量减少全局变量。
 - 草图文件名与其所在目录保持一致（如 `sketches/ps2_scan/ps2_scan.ino`）。
+- 通用逻辑改动需同步更新 `sketches/touchpad_hid_pico` 与 `sketches/touchpad_hid_nrf`。
 
 ## 测试指南
 当前无自动化测试。请在目标硬件上编译并上传，使用串口监视器或设备输出验证行为。
