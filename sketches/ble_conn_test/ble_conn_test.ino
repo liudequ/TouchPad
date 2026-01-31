@@ -5,7 +5,6 @@
 // - BLE HID (mouse)
 // - BLE UART
 // - Device Info Service
-
 BLEDis bledis;
 BLEHidAdafruit blehid;
 BLEUart bleuart;
@@ -36,12 +35,11 @@ void initBle() {
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName("TouchPadTest");
-  Bluefruit.autoConnLed(true);
+  Bluefruit.autoConnLed(false);
 
   Bluefruit.Periph.setConnectCallback(onConnect);
   Bluefruit.Periph.setDisconnectCallback(onDisconnect);
-  Bluefruit.Security.setBonding(true);
-  Bluefruit.Security.setIOCaps(BLE_GAP_IO_CAPS_NONE);
+  Bluefruit.Security.setIOCaps(false, false, false);
 
   bledis.setManufacturer("TouchPad");
   bledis.setModel("nRF52840");
@@ -72,10 +70,11 @@ void loop() {
   }
 }
 
+
 void onConnect(uint16_t conn_handle) {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   if (connection) {
-    connection->requestConnectionParameter(6, 12, 0, 200);
+    connection->requestConnectionParameter(6, 0, 200);
   }
   Serial.println("[ble] connected");
 }
@@ -101,9 +100,9 @@ void sendMouseClick(uint8_t buttons) {
     Serial.println("[hid] not connected");
     return;
   }
-  blehid.mouseReport(buttons, 0, 0, 0, 0);
+  blehid.mouseReport((uint8_t)buttons, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
   delay(5);
-  blehid.mouseReport(0, 0, 0, 0, 0);
+  blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
@@ -111,7 +110,7 @@ void sendMouseMove(int8_t x, int8_t y) {
     Serial.println("[hid] not connected");
     return;
   }
-  blehid.mouseReport(0, x, y, 0, 0);
+  blehid.mouseReport((uint8_t)0, x, y, (int8_t)0, (int8_t)0);
 }
 
 void handleSerial() {
@@ -143,8 +142,10 @@ void processCommand(const String& line) {
 
   if (line.equalsIgnoreCase("INFO")) {
     printStatus();
+    char name[32] = {0};
+    Bluefruit.getName(name, sizeof(name));
     Serial.print("[ble] name=");
-    Serial.println(Bluefruit.getName());
+    Serial.println(name);
     return;
   }
 
@@ -177,7 +178,7 @@ void processCommand(const String& line) {
   }
 
   if (line.equalsIgnoreCase("PAIRCLR")) {
-    Bluefruit.clearBonds();
+    Bluefruit.Periph.clearBonds();
     Serial.println("[ble] bonds cleared");
     return;
   }
