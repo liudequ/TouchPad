@@ -14,10 +14,11 @@
 #define INPUT_REG_L 0x09
 #define INPUT_REG_H 0x01
 
-#define SDA_PIN 4
-#define SCL_PIN 5
-#define INT_PIN 10
-#define TP_EN 9  // ★ 新增：TouchPad ENABLE
+// nRF52840 SuperMini pin mapping (方案 A)
+#define SDA_PIN 6
+#define SCL_PIN 7
+#define INT_PIN 8
+#define TP_EN 9  // TouchPad ENABLE
 
 uint8_t reportBuf[128];
 const unsigned long IDLE_SLEEP_MS = 60000;
@@ -41,7 +42,7 @@ BLEDis bledis;
 BLEHidAdafruit blehid;
 BLEUart bleuart;
 
-using namespace Adafruit_LittleFS;
+using namespace Adafruit_LittleFS_Namespace;
 
 void onConnect(uint16_t conn_handle);
 void onDisconnect(uint16_t conn_handle, uint8_t reason);
@@ -228,8 +229,7 @@ void initBle() {
 
   Bluefruit.Periph.setConnectCallback(onConnect);
   Bluefruit.Periph.setDisconnectCallback(onDisconnect);
-  Bluefruit.Security.setBonding(true);
-  Bluefruit.Security.setIOCaps(BLE_GAP_IO_CAPS_NONE);
+  Bluefruit.Security.setIOCaps(false, false, false);
 
   bledis.setManufacturer("TouchPad");
   bledis.setModel("NRF52840");
@@ -261,7 +261,7 @@ void enterDeepSleep() {
 void onConnect(uint16_t conn_handle) {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   if (connection) {
-    connection->requestConnectionParameter(6, 12, 0, 200);
+    connection->requestConnectionParameter(6, 0, 200);
   }
   Serial.println("[ble] connected");
 }
@@ -1175,8 +1175,7 @@ bool loadConfig() {
     return false;
   }
   while (f.available()) {
-    String line = f.readStringUntil('
-');
+    String line = f.readStringUntil('\n');
     line.trim();
     int eq = line.indexOf('=');
     if (eq < 0) continue;
@@ -1311,7 +1310,10 @@ bool loadConfig() {
 
 bool saveConfig() {
   File f(InternalFS);
-  if (!f.open(CONFIG_PATH, FILE_O_WRITE | FILE_O_CREAT | FILE_O_TRUNC)) {
+  if (InternalFS.exists(CONFIG_PATH)) {
+    InternalFS.remove(CONFIG_PATH);
+  }
+  if (!f.open(CONFIG_PATH, FILE_O_WRITE)) {
     cfgOut->println("[cfg] open failed");
     return false;
   }
@@ -1448,24 +1450,25 @@ void performZoneAction(const ZoneBinding& binding) {
 
 void sendMouseMove(int8_t x, int8_t y) {
   if (!Bluefruit.connected()) return;
-  blehid.mouseReport(0, x, y, 0, 0);
+  blehid.mouseReport((uint8_t)0, x, y, (int8_t)0, (int8_t)0);
 }
 
 void sendMouseWheel(int8_t wheel) {
   if (!Bluefruit.connected()) return;
-  blehid.mouseReport(0, 0, 0, wheel, 0);
+  blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, wheel, (int8_t)0);
 }
 
 void sendMouseClick(uint8_t buttons) {
   if (!Bluefruit.connected()) return;
-  blehid.mouseReport(buttons, 0, 0, 0, 0);
+  blehid.mouseReport((uint8_t)buttons, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
   delay(5);
-  blehid.mouseReport(0, 0, 0, 0, 0);
+  blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
 }
 
 void sendKeyboard(uint8_t modifier, uint8_t keycode) {
   if (!Bluefruit.connected()) return;
-  blehid.keyboardReport(modifier, keycode);
+  uint8_t keys[6] = { keycode, 0, 0, 0, 0, 0 };
+  blehid.keyboardReport(modifier, keys);
   delay(5);
   blehid.keyRelease();
 }

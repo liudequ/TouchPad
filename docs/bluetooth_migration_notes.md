@@ -26,7 +26,7 @@
 - 未完成：引脚映射、配置存储、连接管理细化、BLE 配置通道。
 
 建议补充事项：
-- 板卡依赖确认（Adafruit nRF52 core/ArduinoBLE 等）。
+- 板卡依赖与 `sketches/ble_conn_test/ble_conn_test.ino` 相同：Adafruit nRF52 core + Adafruit Bluefruit nRF52 Libraries。
 - BLE 连接参数调优（延迟与功耗）。
 - 低功耗策略与唤醒。
 - 电量检测/电池状态（后续上电池时）。

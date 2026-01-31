@@ -1,0 +1,169 @@
+menu.softdevice=SoftDevice
+menu.debug=Debug
+menu.debug_output=Debug Output
+
+# ----------------------------------
+# SuperMini nRF52840
+# ----------------------------------
+supermini.name=SuperMini nRF52840
+
+# VID/PID for bootloader
+supermini.vid.0=0x1209
+supermini.pid.0=0x5284
+supermini.vid.1=0x1209
+supermini.pid.1=0x5284
+supermini.vid.2=0x1209
+supermini.pid.2=0x5284
+supermini.vid.3=0x1209
+supermini.pid.3=0x5284
+
+# Upload
+supermini.bootloader.tool=bootburn
+supermini.upload.tool=nrfutil
+supermini.upload.protocol=nrfutil
+supermini.upload.use_1200bps_touch=true
+supermini.upload.wait_for_upload_port=true
+supermini.upload.maximum_size=811008
+supermini.upload.maximum_data_size=237568
+
+# Build
+supermini.build.mcu=cortex-m4
+supermini.build.f_cpu=64000000
+supermini.build.board=SuperMini_nRF52840
+supermini.build.core=nRF5
+supermini.build.variant=SuperMini_nRF52840
+supermini.build.usb_manufacturer="Generic"
+supermini.build.usb_product="SuperMini nRF52840"
+supermini.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
+supermini.build.ldscript=nrf52840_s140_v7.ld
+supermini.build.vid=0x1209
+supermini.build.pid=0x5285
+supermini.build.bootloader_version=1.0.0
+
+# SoftDevice Menu
+supermini.menu.softdevice.s140v6=S140 7.3.0
+supermini.menu.softdevice.s140v6.build.sd_name=s140
+supermini.menu.softdevice.s140v6.build.sd_version=7.3.0
+supermini.menu.softdevice.s140v6.build.sd_fwid=0x0123
+
+# Debug Menu
+supermini.menu.debug.l0=Level 0 (Release)
+supermini.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
+supermini.menu.debug.l1=Level 1 (Error Message)
+supermini.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
+supermini.menu.debug.l2=Level 2 (Full Debug)
+supermini.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
+supermini.menu.debug.l3=Level 3 (Segger SystemView)
+supermini.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
+supermini.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
+
+# ----------------------------------
+# nice!nano v2
+# ----------------------------------
+nicenanov2.name=nice!nano v2
+
+# VID/PID for bootloader
+nicenanov2.vid.0=0x239A
+nicenanov2.pid.0=0x00B3
+nicenanov2.vid.1=0x239A
+nicenanov2.pid.1=0x00B3
+nicenanov2.vid.2=0x239A
+nicenanov2.pid.2=0x00B3
+nicenanov2.vid.3=0x239A
+nicenanov2.pid.3=0x00B3
+
+# Upload
+nicenanov2.bootloader.tool=bootburn
+nicenanov2.upload.tool=nrfutil
+nicenanov2.upload.protocol=nrfutil
+nicenanov2.upload.use_1200bps_touch=true
+nicenanov2.upload.wait_for_upload_port=true
+nicenanov2.upload.maximum_size=811008
+nicenanov2.upload.maximum_data_size=237568
+
+# Build
+nicenanov2.build.mcu=cortex-m4
+nicenanov2.build.f_cpu=64000000
+nicenanov2.build.board=nice_nano_v2
+nicenanov2.build.core=nRF5
+nicenanov2.build.variant=nice_nano
+nicenanov2.build.usb_manufacturer="nice!"
+nicenanov2.build.usb_product="nice!nano v2"
+nicenanov2.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
+nicenanov2.build.ldscript=nrf52840_s140_v7.ld
+nicenanov2.build.vid=0x239A
+nicenanov2.build.pid=0x00B4
+nicenanov2.build.bootloader_version=0.9.2
+
+# SoftDevice Menu
+nicenanov2.menu.softdevice.s140v6=S140 6.1.1
+nicenanov2.menu.softdevice.s140v6.build.sd_name=s140
+nicenanov2.menu.softdevice.s140v6.build.sd_version=6.1.1
+nicenanov2.menu.softdevice.s140v6.build.sd_fwid=0x0123
+
+# Debug Menu
+nicenanov2.menu.debug.l0=Level 0 (Release)
+nicenanov2.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
+nicenanov2.menu.debug.l1=Level 1 (Error Message)
+nicenanov2.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
+nicenanov2.menu.debug.l2=Level 2 (Full Debug)
+nicenanov2.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
+nicenanov2.menu.debug.l3=Level 3 (Segger SystemView)
+nicenanov2.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
+nicenanov2.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
+
+# ----------------------------------
+# nRFMicro nRF52840
+# ----------------------------------
+
+nrfmicro.name=nRFMicro
+
+# VID/PID for bootloader
+nrfmicro.vid.0=0x1209
+nrfmicro.pid.0=0x5284
+nrfmicro.vid.1=0x1209
+nrfmicro.pid.1=0x5284
+nrfmicro.vid.2=0x1209
+nrfmicro.pid.2=0x5284
+nrfmicro.vid.3=0x1209
+nrfmicro.pid.3=0x5284
+
+# Upload
+nrfmicro.bootloader.tool=bootburn
+nrfmicro.upload.tool=nrfutil
+nrfmicro.upload.protocol=nrfutil
+nrfmicro.upload.use_1200bps_touch=true
+nrfmicro.upload.wait_for_upload_port=true
+nrfmicro.upload.maximum_size=811008
+nrfmicro.upload.maximum_data_size=237568
+
+# Build
+nrfmicro.build.mcu=cortex-m4
+nrfmicro.build.f_cpu=64000000
+nrfmicro.build.board=nRFMicro
+nrfmicro.build.core=nRF5
+nrfmicro.build.variant=nRFMicro
+nrfmicro.build.usb_manufacturer="joric"
+nrfmicro.build.usb_product="nRFMicro"
+nrfmicro.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
+nrfmicro.build.ldscript=nrf52840_s140_v7.ld
+nrfmicro.build.vid=0x1209
+nrfmicro.build.pid=0x5285
+nrfmicro.build.bootloader_version=5a96435
+
+# SoftDevice Menu
+nrfmicro.menu.softdevice.s140v6=S140 7.3.0
+nrfmicro.menu.softdevice.s140v6.build.sd_name=s140
+nrfmicro.menu.softdevice.s140v6.build.sd_version=7.3.0
+nrfmicro.menu.softdevice.s140v6.build.sd_fwid=0x0123
+
+# Debug Menu
+nrfmicro.menu.debug.l0=Level 0 (Release)
+nrfmicro.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
+nrfmicro.menu.debug.l1=Level 1 (Error Message)
+nrfmicro.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
+nrfmicro.menu.debug.l2=Level 2 (Full Debug)
+nrfmicro.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
+nrfmicro.menu.debug.l3=Level 3 (Segger SystemView)
+nrfmicro.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
+nrfmicro.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
