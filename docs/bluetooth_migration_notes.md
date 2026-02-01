@@ -37,6 +37,7 @@
   pinMode(PIN_EXT_VCC, OUTPUT);
   digitalWrite(PIN_EXT_VCC, LOW);
   ```
+- 板载红灯可由 P0.15 控制（BLED），在 `nice_nano` 变体中对应 `LED_BUILTIN`。
 
 ## 现成硬件清单（不自制载板）
 必需：
