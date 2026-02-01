@@ -26,3 +26,17 @@
 - 使用本地 `hardware/` 后，IDE 不再依赖 Boards Manager 中的
   `nRFMicro-like Boards` 包。
 - 该方式适用于包名包含空格导致 FQBN 解析异常的情况。
+
+## UF2 刷写命令（nice!nano / UF2 Bootloader）
+编译导出 `.hex` 后，可用 `uf2conv.py` 直接刷写到挂载的 `NICENANO` 盘：
+
+```
+python3 hardware/pdcook/nrf52/tools/uf2conv/uf2conv.py -d /media/liudq/NICENANO your_firmware.hex
+```
+
+如需先生成 `.uf2` 再手动拷贝：
+
+```
+python3 hardware/pdcook/nrf52/tools/uf2conv/uf2conv.py -c -f 0xADA52840 -o your_firmware.uf2 your_firmware.hex
+cp your_firmware.uf2 /media/liudq/NICENANO/
+```

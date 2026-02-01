@@ -31,6 +31,13 @@
 - 低功耗策略与唤醒。
 - 电量检测/电池状态（后续上电池时）。
 
+## 省电优化记录
+- P0.13 / EXT_VCC 软开关：在 nice!nano 变体中，`PIN_EXT_VCC` / `EXT_VCC` / `P0_13` 映射到 P0.13，拉低可关闭外设 3.3V（EXT_VCC），用于断电触摸板等外设以降低功耗。
+  ```cpp
+  pinMode(PIN_EXT_VCC, OUTPUT);
+  digitalWrite(PIN_EXT_VCC, LOW);
+  ```
+
 ## 现成硬件清单（不自制载板）
 必需：
 - Pro Micro nRF52840 开发板（带电池接口/充电）
