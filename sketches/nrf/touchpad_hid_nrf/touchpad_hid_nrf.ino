@@ -79,6 +79,14 @@ class MultiPrint : public Print {
 
 static Print* cfgOut = &Serial;
 static MultiPrint bleOut(&Serial, &bleuart);
+void rebootDevice() {
+#if defined(ARDUINO_ARCH_NRF52)
+  Serial.println("[sys] reboot to DFU");
+  delay(20);
+  NRF_POWER->GPREGRET = 0xB1;
+  NVIC_SystemReset();
+#endif
+}
 /*===== 参数配置区 =====*/
 // 单指移动
 float sensitivity = 0.35f;
@@ -432,6 +440,7 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: SAVE");
     cfgOut->println("CMD: LOAD");
     cfgOut->println("CMD: RESET");
+    cfgOut->println("CMD: BOOT");
     return;
   }
 
@@ -1162,6 +1171,12 @@ void processCommand(const String& line) {
   if (line.equalsIgnoreCase("RESET")) {
     applyDefaults();
     cfgOut->println("OK");
+    return;
+  }
+
+  if (line.equalsIgnoreCase("BOOT")) {
+    cfgOut->println("OK");
+    rebootDevice();
     return;
   }
 
