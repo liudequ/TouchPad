@@ -8,10 +8,10 @@
 - 使能引脚：`TP_EN=GP9`
 - 设备 I2C 地址：`0x2C`
 
-如需修改引脚或地址，编辑 `sketches/touchpad_hid_pico/touchpad_hid_pico.ino` 顶部的宏定义。
+如需修改引脚或地址，编辑 `sketches/pico/touchpad_hid_pico/touchpad_hid_pico.ino` 顶部的宏定义。
 
 ## 烧录步骤
-1. 在 Arduino IDE 中打开 `sketches/touchpad_hid_pico/touchpad_hid_pico.ino`。
+1. 在 Arduino IDE 中打开 `sketches/pico/touchpad_hid_pico/touchpad_hid_pico.ino`。
 2. 选择板卡与串口。
 3. Tools → Flash Size 选择 `Sketch 1M FS 1M`（用于 LittleFS 配置存储）。
 3. 点击 **Upload** 上传固件。
