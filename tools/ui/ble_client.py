@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+import subprocess
 import threading
 import time
 
@@ -31,6 +32,35 @@ class BleClient:
         name = device.name or "Unknown"
         return f"{name} ({device.address})"
 
+    @staticmethod
+    def _bluetoothctl_devices(subcommand):
+        try:
+            output = subprocess.check_output(
+                ["bluetoothctl", subcommand],
+                text=True,
+                stderr=subprocess.STDOUT,
+            )
+        except Exception:
+            return []
+        items = []
+        for line in output.splitlines():
+            line = line.strip()
+            if not line.startswith("Device "):
+                continue
+            parts = line.split(" ", 2)
+            if len(parts) < 2:
+                continue
+            address = parts[1]
+            name = parts[2] if len(parts) >= 3 else "Unknown"
+            items.append((name, address))
+        return items
+
+    def _list_paired_devices(self):
+        return self._bluetoothctl_devices("paired-devices")
+
+    def _list_connected_devices(self):
+        return self._bluetoothctl_devices("devices Connected")
+
     def list_devices(self):
         async def _scan():
             devices = await BleakScanner.discover(timeout=self._scan_timeout)
@@ -39,8 +69,39 @@ class BleClient:
                 items.append((self._format_device(dev), dev.address))
             return items
 
-        future = asyncio.run_coroutine_threadsafe(_scan(), self._loop)
-        return future.result()
+        items = []
+        seen = set()
+        connected = self._list_connected_devices()
+        connected_addrs = {addr for _, addr in connected}
+
+        def add_item(label, address):
+            if not address or address in seen:
+                return
+            seen.add(address)
+            items.append((label, address))
+
+        for name, address in connected:
+            base = f"{name} ({address})" if name else address
+            add_item(f"{base} [connected]", address)
+
+        try:
+            future = asyncio.run_coroutine_threadsafe(_scan(), self._loop)
+            scanned = future.result()
+        except Exception:
+            scanned = []
+        for label, address in scanned:
+            if address in connected_addrs and "[connected]" not in label:
+                label = f"{label} [connected]"
+            add_item(label, address)
+
+        for name, address in self._list_paired_devices():
+            base = f"{name} ({address})" if name else address
+            label = f"{base} [paired]"
+            if address in connected_addrs:
+                label = f"{base} [connected]"
+            add_item(label, address)
+
+        return items
 
     def _notify_handler(self, _sender, data):
         with self._lock:

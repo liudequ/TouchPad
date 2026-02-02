@@ -40,8 +40,6 @@ const unsigned long IDLE_SLEEP_MS = 60000;
 
 BLEDis bledis;
 BLEHidAdafruit blehid;
-BLEUart bleuart;
-
 using namespace Adafruit_LittleFS_Namespace;
 
 void onConnect(uint16_t conn_handle);
@@ -51,34 +49,7 @@ void onDisconnect(uint16_t conn_handle, uint8_t reason);
 extern const uint32_t g_ADigitalPinMap[];
 #endif
 
-class MultiPrint : public Print {
- public:
-  MultiPrint(Print* primary, Print* secondary) : primary_(primary), secondary_(secondary) {}
-
-  void set(Print* primary, Print* secondary) {
-    primary_ = primary;
-    secondary_ = secondary;
-  }
-
-  size_t write(uint8_t c) override {
-    if (primary_) primary_->write(c);
-    if (secondary_) secondary_->write(c);
-    return 1;
-  }
-
-  size_t write(const uint8_t* buffer, size_t size) override {
-    if (primary_) primary_->write(buffer, size);
-    if (secondary_) secondary_->write(buffer, size);
-    return size;
-  }
-
- private:
-  Print* primary_;
-  Print* secondary_;
-};
-
 static Print* cfgOut = &Serial;
-static MultiPrint bleOut(&Serial, &bleuart);
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
   Serial.println("[sys] reboot to DFU");
@@ -222,7 +193,6 @@ void startAdv() {
   Bluefruit.Advertising.addTxPower();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_MOUSE);
   Bluefruit.Advertising.addService(blehid);
-  Bluefruit.Advertising.addService(bleuart);
   Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.restartOnDisconnect(true);
@@ -244,7 +214,6 @@ void initBle() {
   bledis.begin();
 
   blehid.begin();
-  bleuart.begin();
   startAdv();
 }
 
@@ -336,7 +305,6 @@ bool parseType(const String& value, ZoneType* out) {
    ===========================*/
 void loop() {
   handleSerial();
-  handleBleUart();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
@@ -406,24 +374,6 @@ void handleSerial() {
       if (line.length() > 0) {
         cfgOut = &Serial;
         processCommand(line);
-      }
-      line = "";
-    } else if (c != '\r') {
-      line += c;
-    }
-  }
-}
-
-void handleBleUart() {
-  static String line;
-  while (bleuart.available()) {
-    char c = (char)bleuart.read();
-    if (c == '\n') {
-      line.trim();
-      if (line.length() > 0) {
-        cfgOut = &bleOut;
-        processCommand(line);
-        cfgOut = &Serial;
       }
       line = "";
     } else if (c != '\r') {

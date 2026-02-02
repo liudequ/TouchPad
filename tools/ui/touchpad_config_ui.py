@@ -5,14 +5,6 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from serial_client import SerialClient
 
-try:
-    from ble_client import BleClient
-except Exception as exc:
-    BleClient = None
-    BLE_IMPORT_ERROR = exc
-else:
-    BLE_IMPORT_ERROR = None
-
 
 ZONE_TYPES = ["NONE", "MOUSE", "KEYBOARD"]
 HID_KEY_MAP = {
@@ -125,7 +117,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle("触摸板配置")
         self.serial_client = SerialClient()
-        self.ble_client = BleClient() if BleClient else None
         self.client = None
         self._build_ui()
         self._refresh_targets()
@@ -135,22 +126,23 @@ class TouchpadConfigUI(QtWidgets.QWidget):
 
         conn_group = QtWidgets.QGroupBox("连接")
         conn_layout = QtWidgets.QHBoxLayout(conn_group)
-        self.conn_type_combo = QtWidgets.QComboBox()
-        self.conn_type_combo.addItems(["USB串口", "BLE"])
+        self.conn_type_label = QtWidgets.QLabel("USB串口")
         self.port_combo = QtWidgets.QComboBox()
         self.refresh_btn = QtWidgets.QPushButton("刷新")
         self.connect_btn = QtWidgets.QPushButton("连接")
         self.status_label = QtWidgets.QLabel("未连接")
-        conn_layout.addWidget(self.conn_type_combo)
+        conn_layout.addWidget(self.conn_type_label)
         conn_layout.addWidget(self.port_combo)
         conn_layout.addWidget(self.refresh_btn)
         conn_layout.addWidget(self.connect_btn)
         conn_layout.addWidget(self.status_label)
         layout.addWidget(conn_group)
 
-        self.ble_hint = QtWidgets.QLabel("BLE 需先在系统蓝牙中配对，再回到此处连接。")
+        self.ble_hint = QtWidgets.QLabel(
+            "提示：当前 nRF 固件已移除 BLE 调参，仅支持 USB 串口调参。"
+        )
         self.ble_hint.setWordWrap(True)
-        self.ble_hint.setVisible(False)
+        self.ble_hint.setVisible(True)
         layout.addWidget(self.ble_hint)
 
         scroll_area = QtWidgets.QScrollArea()
@@ -241,7 +233,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
 
         self.refresh_btn.clicked.connect(self._refresh_targets)
         self.connect_btn.clicked.connect(self._toggle_connection)
-        self.conn_type_combo.currentIndexChanged.connect(self._on_conn_type_changed)
         self.apply_btn.clicked.connect(self._apply)
         self.refresh_values_btn.clicked.connect(self._refresh_values)
         self.save_btn.clicked.connect(self._save)
@@ -293,42 +284,14 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         dialog.accept()
 
     def _current_client(self):
-        if self.conn_type_combo.currentText() == "BLE":
-            return self.ble_client
         return self.serial_client
 
     def _refresh_targets(self):
         self.port_combo.clear()
-        if self.conn_type_combo.currentText() == "BLE":
-            if not self.ble_client:
-                self.status_label.setText("BLE不可用")
-                if BLE_IMPORT_ERROR:
-                    self._log(f"BLE初始化失败：{BLE_IMPORT_ERROR}")
-                return
-            try:
-                devices = self.ble_client.list_devices()
-            except Exception as exc:
-                self._log(f"扫描失败：{exc}")
-                self.status_label.setText("扫描失败")
-                return
-            for label, address in devices:
-                self.port_combo.addItem(label, address)
-            if not devices:
-                self.status_label.setText("无BLE设备")
-        else:
-            ports = SerialClient.list_ports()
-            self.port_combo.addItems(ports)
-            if not ports:
-                self.status_label.setText("无串口")
-
-    def _on_conn_type_changed(self):
-        if self.client and self.client.is_connected():
-            self.client.disconnect()
-            self.status_label.setText("未连接")
-            self.connect_btn.setText("连接")
-            self.client = None
-        self.ble_hint.setVisible(self.conn_type_combo.currentText() == "BLE")
-        self._refresh_targets()
+        ports = SerialClient.list_ports()
+        self.port_combo.addItems(ports)
+        if not ports:
+            self.status_label.setText("无串口")
 
     def _toggle_connection(self):
         if self.client and self.client.is_connected():
