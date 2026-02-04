@@ -67,6 +67,8 @@ static bool lastUsbMounted = false;
 static int16_t bleAccumX = 0;
 static int16_t bleAccumY = 0;
 static unsigned long lastBleReportMs = 0;
+static float bleBiasX = 0.0f;
+static float bleBiasY = 0.0f;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
@@ -104,6 +106,11 @@ const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
 const uint8_t BLE_REPORT_INTERVAL_MS = 3;
 const int16_t BLE_MAX_STEP = 16;
+const int16_t BLE_MIN_STEP = 2;
+const uint16_t BLE_IDLE_RESET_MS = 20;
+const float BLE_BIAS_ALPHA = 0.06f;
+const int16_t BLE_BIAS_CLAMP = 6;
+const int16_t BLE_BIAS_SAMPLE_MAX = 4;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -238,6 +245,8 @@ void updateTransport() {
     bleAccumX = 0;
     bleAccumY = 0;
     lastBleReportMs = 0;
+    bleBiasX = 0.0f;
+    bleBiasY = 0.0f;
     if (Bluefruit.connected()) {
       Bluefruit.disconnect(0);
       delay(50);
@@ -255,6 +264,8 @@ void initBle() {
   Bluefruit.setTxPower(4);
   Bluefruit.setName("TouchPad");
   Bluefruit.autoConnLed(true);
+  // Request a faster, steadier connection interval (7.5–15 ms).
+  Bluefruit.Periph.setConnInterval(6, 12);
 
   Bluefruit.Periph.setConnectCallback(onConnect);
   Bluefruit.Periph.setDisconnectCallback(onDisconnect);
@@ -1478,15 +1489,30 @@ void sendMouseMove(int8_t x, int8_t y) {
   bleAccumY += y;
   unsigned long now = millis();
   if (now - lastBleReportMs < BLE_REPORT_INTERVAL_MS) return;
-  lastBleReportMs = now;
 
-  int16_t sendX = constrain(bleAccumX, -127, 127);
-  int16_t sendY = constrain(bleAccumY, -127, 127);
+  if (abs(bleAccumX) <= BLE_BIAS_SAMPLE_MAX && abs(bleAccumY) <= BLE_BIAS_SAMPLE_MAX) {
+    bleBiasX += (bleAccumX - bleBiasX) * BLE_BIAS_ALPHA;
+    bleBiasY += (bleAccumY - bleBiasY) * BLE_BIAS_ALPHA;
+    bleBiasX = constrain(bleBiasX, -BLE_BIAS_CLAMP, BLE_BIAS_CLAMP);
+    bleBiasY = constrain(bleBiasY, -BLE_BIAS_CLAMP, BLE_BIAS_CLAMP);
+  }
+
+  if (abs(bleAccumX) < BLE_MIN_STEP && abs(bleAccumY) < BLE_MIN_STEP) {
+    if (now - lastBleReportMs >= BLE_IDLE_RESET_MS) {
+      bleAccumX = 0;
+      bleAccumY = 0;
+    }
+    return;
+  }
+
+  int16_t sendX = constrain((int16_t)roundf(bleAccumX - bleBiasX), -127, 127);
+  int16_t sendY = constrain((int16_t)roundf(bleAccumY - bleBiasY), -127, 127);
   sendX = constrain(sendX, -BLE_MAX_STEP, BLE_MAX_STEP);
   sendY = constrain(sendY, -BLE_MAX_STEP, BLE_MAX_STEP);
   if (sendX == 0 && sendY == 0) return;
   bleAccumX -= sendX;
   bleAccumY -= sendY;
+  lastBleReportMs = now;
   blehid.mouseReport((uint8_t)0, (int8_t)sendX, (int8_t)sendY, (int8_t)0, (int8_t)0);
 }
 
