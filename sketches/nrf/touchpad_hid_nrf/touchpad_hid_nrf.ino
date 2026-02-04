@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <Adafruit_LittleFS.h>
 #include <InternalFileSystem.h>
+#include <Adafruit_TinyUSB.h>
 #include <bluefruit.h>
 #if defined(ARDUINO_ARCH_NRF52)
 #include <nrf.h>
@@ -22,6 +23,18 @@
 
 uint8_t reportBuf[128];
 const unsigned long IDLE_SLEEP_MS = 60000;
+
+enum {
+  RID_MOUSE = 1,
+  RID_KEYBOARD = 2,
+};
+
+Adafruit_USBD_HID usb_hid;
+
+uint8_t const hid_report_descriptor[] = {
+  TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(RID_MOUSE)),
+  TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(RID_KEYBOARD))
+};
 
 // Minimal HID keycodes used by defaults, defined here to avoid core-specific headers.
 #ifndef KEYBOARD_MODIFIER_LEFTALT
@@ -50,6 +63,12 @@ extern const uint32_t g_ADigitalPinMap[];
 #endif
 
 static Print* cfgOut = &Serial;
+static bool lastUsbMounted = false;
+
+bool isUsbMounted() {
+  return TinyUSBDevice.mounted();
+}
+
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
   Serial.println("[sys] reboot to DFU");
@@ -188,6 +207,12 @@ void initI2C() {
   delay(50);
 }
 
+void initUsbHid() {
+  usb_hid.setReportDescriptor(hid_report_descriptor,
+                              sizeof(hid_report_descriptor));
+  usb_hid.begin();
+}
+
 void startAdv() {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
@@ -197,6 +222,24 @@ void startAdv() {
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.restartOnDisconnect(true);
   Bluefruit.Advertising.start(0);
+}
+
+void updateTransport() {
+  bool usbMounted = isUsbMounted();
+  if (usbMounted == lastUsbMounted) return;
+  lastUsbMounted = usbMounted;
+
+  if (usbMounted) {
+    if (Bluefruit.connected()) {
+      Bluefruit.disconnect(0);
+      delay(50);
+    }
+    Bluefruit.Advertising.stop();
+    Serial.println("[usb] mounted, BLE stopped");
+  } else {
+    startAdv();
+    Serial.println("[usb] unmounted, BLE advertising");
+  }
 }
 
 void initBle() {
@@ -268,7 +311,9 @@ void setup() {
     Serial.println("[cfg] InternalFS mount failed");
   }
 
+  initUsbHid();
   initBle();
+  updateTransport();
   lastActivityMs = millis();
 }
 
@@ -305,10 +350,11 @@ bool parseType(const String& value, ZoneType* out) {
    ===========================*/
 void loop() {
   handleSerial();
+  updateTransport();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
-  if (millis() - lastActivityMs > IDLE_SLEEP_MS) {
+  if (!isUsbMounted() && millis() - lastActivityMs > IDLE_SLEEP_MS) {
     enterDeepSleep();
   }
 
@@ -1414,16 +1460,34 @@ void performZoneAction(const ZoneBinding& binding) {
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
+  if (isUsbMounted()) {
+    uint8_t report[5] = { 0, (uint8_t)x, (uint8_t)y, 0, 0 };
+    usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+    return;
+  }
   if (!Bluefruit.connected()) return;
   blehid.mouseReport((uint8_t)0, x, y, (int8_t)0, (int8_t)0);
 }
 
 void sendMouseWheel(int8_t wheel) {
+  if (isUsbMounted()) {
+    uint8_t report[5] = { 0, 0, 0, (uint8_t)wheel, 0 };
+    usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+    return;
+  }
   if (!Bluefruit.connected()) return;
   blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, wheel, (int8_t)0);
 }
 
 void sendMouseClick(uint8_t buttons) {
+  if (isUsbMounted()) {
+    uint8_t report[5] = { buttons, 0, 0, 0, 0 };
+    usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+    delay(5);
+    report[0] = 0;
+    usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
+    return;
+  }
   if (!Bluefruit.connected()) return;
   blehid.mouseReport((uint8_t)buttons, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
   delay(5);
@@ -1431,6 +1495,14 @@ void sendMouseClick(uint8_t buttons) {
 }
 
 void sendKeyboard(uint8_t modifier, uint8_t keycode) {
+  if (isUsbMounted()) {
+    uint8_t report[8] = { modifier, 0, keycode, 0, 0, 0, 0, 0 };
+    usb_hid.sendReport(RID_KEYBOARD, report, sizeof(report));
+    delay(5);
+    for (uint8_t i = 0; i < sizeof(report); i++) report[i] = 0;
+    usb_hid.sendReport(RID_KEYBOARD, report, sizeof(report));
+    return;
+  }
   if (!Bluefruit.connected()) return;
   uint8_t keys[6] = { keycode, 0, 0, 0, 0, 0 };
   blehid.keyboardReport(modifier, keys);
