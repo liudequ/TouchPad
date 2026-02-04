@@ -145,7 +145,7 @@ void applyDefaults() {
 void touchColdBoot() {
   pinMode(TP_EN, OUTPUT);
 
-  digitalWrrwudite(TP_EN, LOW);  // Disable
+  digitalWrite(TP_EN, LOW);  // Disable
   delay(20);
 
   digitalWrite(TP_EN, HIGH);  // Enable（关键上升沿）

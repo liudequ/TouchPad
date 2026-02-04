@@ -64,6 +64,9 @@ extern const uint32_t g_ADigitalPinMap[];
 
 static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
+static int16_t bleAccumX = 0;
+static int16_t bleAccumY = 0;
+static unsigned long lastBleReportMs = 0;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
@@ -99,6 +102,8 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
+const uint8_t BLE_REPORT_INTERVAL_MS = 3;
+const int16_t BLE_MAX_STEP = 16;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -230,6 +235,9 @@ void updateTransport() {
   lastUsbMounted = usbMounted;
 
   if (usbMounted) {
+    bleAccumX = 0;
+    bleAccumY = 0;
+    lastBleReportMs = 0;
     if (Bluefruit.connected()) {
       Bluefruit.disconnect(0);
       delay(50);
@@ -1466,7 +1474,20 @@ void sendMouseMove(int8_t x, int8_t y) {
     return;
   }
   if (!Bluefruit.connected()) return;
-  blehid.mouseReport((uint8_t)0, x, y, (int8_t)0, (int8_t)0);
+  bleAccumX += x;
+  bleAccumY += y;
+  unsigned long now = millis();
+  if (now - lastBleReportMs < BLE_REPORT_INTERVAL_MS) return;
+  lastBleReportMs = now;
+
+  int16_t sendX = constrain(bleAccumX, -127, 127);
+  int16_t sendY = constrain(bleAccumY, -127, 127);
+  sendX = constrain(sendX, -BLE_MAX_STEP, BLE_MAX_STEP);
+  sendY = constrain(sendY, -BLE_MAX_STEP, BLE_MAX_STEP);
+  if (sendX == 0 && sendY == 0) return;
+  bleAccumX -= sendX;
+  bleAccumY -= sendY;
+  blehid.mouseReport((uint8_t)0, (int8_t)sendX, (int8_t)sendY, (int8_t)0, (int8_t)0);
 }
 
 void sendMouseWheel(int8_t wheel) {
