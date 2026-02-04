@@ -4,8 +4,8 @@
 $fn = 64;
 
 // Inner cavity (fits touchpad)
-inner_length = 111;
-inner_width  = 63;
+inner_length = 113;
+inner_width  = 65;
 inner_height = 9.5;
 
 wall_thickness  = 2;
