@@ -85,9 +85,9 @@ void rebootDevice() {
 }
 /*===== 参数配置区 =====*/
 // 单指移动
-float sensitivity = 0.02f;
+float sensitivity = 0.2f;
 float smoothFactor = 0.3f;
-float accelFactor = 0.0005f;
+float accelFactor = 0.002f;
 float maxAccel = 1.5f;
 const int16_t MAX_DELTA = 30;
 const int16_t MOVE_DEADBAND = 2;
