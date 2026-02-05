@@ -418,9 +418,11 @@ void loop() {
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
     if (now - lastReportMs >= REPORT_INTERVAL_MS) {
+      unsigned long dtMs = now - lastReportMs;
       lastReportMs = now;
-      accumX += velX;
-      accumY += velY;
+      float dt = dtMs / (float)REPORT_INTERVAL_MS;
+      accumX += velX * dt;
+      accumY += velY * dt;
       int16_t mx16 = (int16_t)accumX;
       int16_t my16 = (int16_t)accumY;
       mx16 = constrain(mx16, -127, 127);
