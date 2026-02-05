@@ -63,6 +63,25 @@
 - BLE 延迟主要受连接间隔、从机延迟、报告节流影响。
 - 空闲时进入低功耗或深睡可显著节能，但会增加唤醒/重连延迟。
 
+## BLE 抓包与上报频率分析
+用于评估 BLE HID 实际上报频率（连接间隔、主机协商结果）。
+
+### btmon + Wireshark（无需额外硬件）
+1. 开始抓包：`sudo btmon -w /tmp/ble.btsnoop`
+2. 连接触摸板并操作 10–20 秒。
+3. 停止抓包（Ctrl+C）。
+4. Wireshark 打开 `/tmp/ble.btsnoop`。
+5. 过滤 HID 输入通知：`btatt.opcode == 0x1b`
+6. 查看间隔/频率：
+   - 视图 → 时间显示格式 → 与上一显示分组的时间差（秒）
+   - 统计 → IO 图表（设置时间间隔如 0.01s 观察密度）
+
+### 命令行直接算平均间隔
+```bash
+tshark -r /tmp/ble.btsnoop -Y 'btatt.opcode==0x1b' -T fields -e frame.time_delta_displayed \
+| awk '{sum+=$1; n++} END {if(n>0) printf("avg=%.6f s, freq=%.2f Hz\n", sum/n, 1/(sum/n))}'
+```
+
 ## 待确认事项
 - 目标主机系统（Windows/macOS/Linux）。
 - 目标电池容量与续航要求。
