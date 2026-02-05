@@ -64,9 +64,14 @@ extern const uint32_t g_ADigitalPinMap[];
 
 static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
+static bool useBleWhenUsb = true;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
+}
+
+bool useBleTransport() {
+  return !isUsbMounted() || useBleWhenUsb;
 }
 
 void rebootDevice() {
@@ -170,6 +175,7 @@ void applyDefaults() {
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
   enableNavZones = true;
+  useBleWhenUsb = true;
   leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
   rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
   rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
@@ -240,12 +246,17 @@ void updateTransport() {
   lastUsbMounted = usbMounted;
 
   if (usbMounted) {
-    if (Bluefruit.connected()) {
+    if (!useBleWhenUsb && Bluefruit.connected()) {
       Bluefruit.disconnect(0);
       delay(50);
     }
-    Bluefruit.Advertising.stop();
-    Serial.println("[usb] mounted, BLE stopped");
+    if (!useBleWhenUsb) {
+      Bluefruit.Advertising.stop();
+      Serial.println("[usb] mounted, BLE stopped");
+    } else {
+      startAdv();
+      Serial.println("[usb] mounted, BLE active");
+    }
   } else {
     startAdv();
     Serial.println("[usb] unmounted, BLE advertising");
@@ -374,7 +385,7 @@ void loop() {
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
-  if (!isUsbMounted() && millis() - lastActivityMs > IDLE_SLEEP_MS) {
+  if (useBleTransport() && millis() - lastActivityMs > IDLE_SLEEP_MS) {
     enterDeepSleep();
   }
 
@@ -404,10 +415,10 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
-    accumX += velX;
-    accumY += velY;
     if (now - lastReportMs >= REPORT_INTERVAL_MS) {
       lastReportMs = now;
+      accumX += velX;
+      accumY += velY;
       int16_t mx16 = (int16_t)accumX;
       int16_t my16 = (int16_t)accumY;
       mx16 = constrain(mx16, -127, 127);
@@ -469,6 +480,7 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: LOAD");
     cfgOut->println("CMD: RESET");
     cfgOut->println("CMD: BOOT");
+    cfgOut->println("CMD: GET useBleWhenUsb");
     return;
   }
 
@@ -481,6 +493,8 @@ void processCommand(const String& line) {
     cfgOut->println(SIDE_ZONE_PERCENT);
     cfgOut->print("enableNavZones=");
     cfgOut->println(enableNavZones ? "1" : "0");
+    cfgOut->print("useBleWhenUsb=");
+    cfgOut->println(useBleWhenUsb ? "1" : "0");
     cfgOut->print("leftTopType=");
     cfgOut->println(typeToString(leftTopZone.type));
     cfgOut->print("leftTopButtons=");
@@ -577,6 +591,11 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("enableNavZones")) {
       cfgOut->print("enableNavZones=");
       cfgOut->println(enableNavZones ? "1" : "0");
+      return;
+    }
+    if (key.equalsIgnoreCase("useBleWhenUsb")) {
+      cfgOut->print("useBleWhenUsb=");
+      cfgOut->println(useBleWhenUsb ? "1" : "0");
       return;
     }
     if (key.equalsIgnoreCase("leftTopType")) {
@@ -808,6 +827,18 @@ void processCommand(const String& line) {
         cfgOut->println("OK");
       } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
         enableNavZones = false;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("useBleWhenUsb")) {
+      if (valueStr.equalsIgnoreCase("1") || valueStr.equalsIgnoreCase("true")) {
+        useBleWhenUsb = true;
+        cfgOut->println("OK");
+      } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
+        useBleWhenUsb = false;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1237,6 +1268,8 @@ bool loadConfig() {
       if (v >= 5 && v <= 50) SIDE_ZONE_PERCENT = (uint8_t)v;
     } else if (key.equalsIgnoreCase("enableNavZones")) {
       enableNavZones = (value == "1" || value.equalsIgnoreCase("true"));
+    } else if (key.equalsIgnoreCase("useBleWhenUsb")) {
+      useBleWhenUsb = (value == "1" || value.equalsIgnoreCase("true"));
     } else if (key.equalsIgnoreCase("leftTopType")) {
       ZoneType type;
       if (parseType(value, &type)) leftTopZone.type = type;
@@ -1368,6 +1401,8 @@ bool saveConfig() {
   f.println(SIDE_ZONE_PERCENT);
   f.print("enableNavZones=");
   f.println(enableNavZones ? "1" : "0");
+  f.print("useBleWhenUsb=");
+  f.println(useBleWhenUsb ? "1" : "0");
   f.print("leftTopType=");
   f.println(typeToString(leftTopZone.type));
   f.print("leftTopButtons=");
@@ -1496,7 +1531,7 @@ void sendMouseMove(int8_t x, int8_t y) {
   Serial.print((int)x);
   Serial.print(" dy=");
   Serial.println((int)y);
-  if (isUsbMounted()) {
+  if (!useBleTransport()) {
     uint8_t report[5] = { 0, (uint8_t)x, (uint8_t)y, 0, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
     return;
@@ -1506,7 +1541,7 @@ void sendMouseMove(int8_t x, int8_t y) {
 }
 
 void sendMouseWheel(int8_t wheel) {
-  if (isUsbMounted()) {
+  if (!useBleTransport()) {
     uint8_t report[5] = { 0, 0, 0, (uint8_t)wheel, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
     return;
@@ -1516,7 +1551,7 @@ void sendMouseWheel(int8_t wheel) {
 }
 
 void sendMouseClick(uint8_t buttons) {
-  if (isUsbMounted()) {
+  if (!useBleTransport()) {
     uint8_t report[5] = { buttons, 0, 0, 0, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
     delay(5);
@@ -1531,7 +1566,7 @@ void sendMouseClick(uint8_t buttons) {
 }
 
 void sendKeyboard(uint8_t modifier, uint8_t keycode) {
-  if (isUsbMounted()) {
+  if (!useBleTransport()) {
     uint8_t report[8] = { modifier, 0, keycode, 0, 0, 0, 0, 0 };
     usb_hid.sendReport(RID_KEYBOARD, report, sizeof(report));
     delay(5);
