@@ -303,7 +303,7 @@ void enterDeepSleep() {
 void onConnect(uint16_t conn_handle) {
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   if (connection) {
-    connection->requestConnectionParameter(6, 0, 200);
+    connection->requestConnectionParameter(12, 0, 400);
   }
   Serial.println("[ble] connected");
 }
