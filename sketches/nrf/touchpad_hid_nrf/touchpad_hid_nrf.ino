@@ -425,8 +425,12 @@ void loop() {
     accumY += velY;
     if (now - lastReportMs >= REPORT_INTERVAL_MS) {
       lastReportMs = now;
-      int8_t mx = (int8_t)accumX;
-      int8_t my = (int8_t)accumY;
+      int16_t mx16 = (int16_t)accumX;
+      int16_t my16 = (int16_t)accumY;
+      mx16 = constrain(mx16, -127, 127);
+      my16 = constrain(my16, -127, 127);
+      int8_t mx = (int8_t)mx16;
+      int8_t my = (int8_t)my16;
       if (mx || my) {
         sendMouseMove(mx, my);
         accumX -= mx;
@@ -439,7 +443,9 @@ void loop() {
     accumScroll += scrollVel;
     if (now - lastScrollReportMs >= REPORT_INTERVAL_MS) {
       lastScrollReportMs = now;
-      int8_t s = (int8_t)accumScroll;
+      int16_t s16 = (int16_t)accumScroll;
+      s16 = constrain(s16, -127, 127);
+      int8_t s = (int8_t)s16;
       if (s) {
         sendMouseWheel(naturalScroll ? s : -s);
         accumScroll -= s;
@@ -1503,6 +1509,10 @@ void performZoneAction(const ZoneBinding& binding) {
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
+  Serial.print("[report] dx=");
+  Serial.print((int)x);
+  Serial.print(" dy=");
+  Serial.println((int)y);
   if (isUsbMounted()) {
     uint8_t report[5] = { 0, (uint8_t)x, (uint8_t)y, 0, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
