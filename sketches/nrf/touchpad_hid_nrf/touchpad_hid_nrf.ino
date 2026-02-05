@@ -69,8 +69,6 @@ static int16_t bleAccumY = 0;
 static unsigned long lastBleReportMs = 0;
 static float bleBiasX = 0.0f;
 static float bleBiasY = 0.0f;
-static unsigned long lastDiagMs = 0;
-static bool hidProbeDone = false;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
@@ -224,9 +222,17 @@ void initI2C() {
 }
 
 void initUsbHid() {
+  if (!TinyUSBDevice.isInitialized()) {
+    TinyUSBDevice.begin(0);
+  }
   usb_hid.setReportDescriptor(hid_report_descriptor,
                               sizeof(hid_report_descriptor));
   usb_hid.begin();
+  if (TinyUSBDevice.mounted()) {
+    TinyUSBDevice.detach();
+    delay(10);
+    TinyUSBDevice.attach();
+  }
 }
 
 void startAdv() {
@@ -324,32 +330,25 @@ void setup() {
   Serial.println("[boot] touchpad_hid_nrf start");
 
   // ★★★ 冷启动修复关键 ★★★
-  Serial.println("[boot] touchColdBoot");
   touchColdBoot();
 
   // INT 必须提前配置，防止悬空
-  Serial.println("[boot] INT pin setup");
   pinMode(INT_PIN, INPUT_PULLUP);
 
   // I2C 初始化（延后）
-  Serial.println("[boot] initI2C");
   initI2C();
 
   applyDefaults();
-  Serial.println("[boot] format InternalFS");
   if (!InternalFS.format()) {
     Serial.println("[cfg] InternalFS format failed");
   }
-  Serial.println("[boot] load config");
   if (InternalFS.begin()) {
     loadConfig();
   } else {
     Serial.println("[cfg] InternalFS mount failed");
   }
 
-  Serial.println("[boot] init USB HID");
   initUsbHid();
-  Serial.println("[boot] init BLE");
   initBle();
   updateTransport();
   lastActivityMs = millis();
@@ -394,22 +393,6 @@ void loop() {
   }
   if (!isUsbMounted() && millis() - lastActivityMs > IDLE_SLEEP_MS) {
     enterDeepSleep();
-  }
-  if (millis() - lastDiagMs >= 1000) {
-    lastDiagMs = millis();
-    Serial.print("[diag] INT=");
-    Serial.print(digitalRead(INT_PIN));
-    Serial.print(" USB=");
-    Serial.print(isUsbMounted() ? 1 : 0);
-    Serial.print(" BLE=");
-    Serial.println(Bluefruit.connected() ? 1 : 0);
-  }
-  if (!hidProbeDone && isUsbMounted() && millis() > 1500) {
-    hidProbeDone = true;
-    Serial.println("[diag] USB HID probe");
-    sendMouseMove(1, 0);
-    delay(5);
-    sendMouseMove(-1, 0);
   }
 
   unsigned long now = millis();
