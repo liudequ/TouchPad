@@ -110,6 +110,8 @@ const int16_t TOUCH_MAX_X = 2628;
 const int16_t TOUCH_MAX_Y = 1332;
 uint8_t TOP_ZONE_PERCENT = 20;
 uint8_t SIDE_ZONE_PERCENT = 35;
+const float AXIS_SCALE_X = 1.0f;
+const float AXIS_SCALE_Y = (float)TOUCH_MAX_Y / (float)TOUCH_MAX_X;
 
 bool enableNavZones = true;
 
@@ -1480,8 +1482,8 @@ void handleReport(uint8_t* buf, uint16_t len) {
         return;
       }
 
-      float fx = dx * sensitivity;
-      float fy = dy * sensitivity;
+      float fx = dx * sensitivity * AXIS_SCALE_X;
+      float fy = dy * sensitivity * AXIS_SCALE_Y;
 
       float speed = sqrt(fx * fx + fy * fy);
       float accel = 1.0f + min(speed * accelFactor, maxAccel);
