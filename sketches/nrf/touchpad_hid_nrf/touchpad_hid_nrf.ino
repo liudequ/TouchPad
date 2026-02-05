@@ -104,6 +104,7 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
+const uint32_t REPORT_INTERVAL_MS = 16;
 const uint8_t BLE_REPORT_INTERVAL_MS = 3;
 const int16_t BLE_MAX_STEP = 16;
 const int16_t BLE_MIN_STEP = 2;
@@ -143,10 +144,12 @@ unsigned long tripleStartTime = 0;
 float smoothDx = 0, smoothDy = 0;
 float accumX = 0, accumY = 0;
 float velX = 0, velY = 0;
+unsigned long lastReportMs = 0;
 
 float smoothScroll = 0;
 float accumScroll = 0;
 float scrollVel = 0;
+unsigned long lastScrollReportMs = 0;
 
 bool tapCandidate = false;
 unsigned long tapStartTime = 0;
@@ -405,21 +408,27 @@ void loop() {
   if (mode == MODE_SINGLE && !tapCandidate) {
     accumX += velX;
     accumY += velY;
-    int8_t mx = (int8_t)accumX;
-    int8_t my = (int8_t)accumY;
-    if (mx || my) {
-      sendMouseMove(mx, my);
-      accumX -= mx;
-      accumY -= my;
+    if (now - lastReportMs >= REPORT_INTERVAL_MS) {
+      lastReportMs = now;
+      int8_t mx = (int8_t)accumX;
+      int8_t my = (int8_t)accumY;
+      if (mx || my) {
+        sendMouseMove(mx, my);
+        accumX -= mx;
+        accumY -= my;
+      }
     }
   }
 
   if (mode == MODE_DOUBLE) {
     accumScroll += scrollVel;
-    int8_t s = (int8_t)accumScroll;
-    if (s) {
-      sendMouseWheel(naturalScroll ? s : -s);
-      accumScroll -= s;
+    if (now - lastScrollReportMs >= REPORT_INTERVAL_MS) {
+      lastScrollReportMs = now;
+      int8_t s = (int8_t)accumScroll;
+      if (s) {
+        sendMouseWheel(naturalScroll ? s : -s);
+        accumScroll -= s;
+      }
     }
   }
 
