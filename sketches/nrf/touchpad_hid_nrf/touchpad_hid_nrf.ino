@@ -97,7 +97,6 @@ float scrollSensitivity = 0.00002f;
 float scrollSmoothFactor = 0.2f;
 bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
-bool bleIdleSleepEnabled = false;
 
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
