@@ -57,7 +57,7 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
-const uint32_t REPORT_INTERVAL_MS = 16;
+const uint32_t REPORT_INTERVAL_MS = 8;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;

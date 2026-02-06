@@ -105,7 +105,7 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
-const uint32_t REPORT_INTERVAL_MS = 16;
+const uint32_t REPORT_INTERVAL_MS = 8;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -272,8 +272,8 @@ void initBle() {
   Bluefruit.setTxPower(4);
   Bluefruit.setName("TouchPad");
   Bluefruit.autoConnLed(true);
-  // Request a faster, steadier connection interval (7.5–15 ms).
-  Bluefruit.Periph.setConnInterval(6, 12);
+  // Request a faster, steadier connection interval (7.5–11.25 ms).
+  Bluefruit.Periph.setConnInterval(6, 9);
 
   Bluefruit.Periph.setConnectCallback(onConnect);
   Bluefruit.Periph.setDisconnectCallback(onDisconnect);
@@ -432,6 +432,12 @@ void loop() {
       my16 = constrain(my16, -127, 127);
       int8_t mx = (int8_t)mx16;
       int8_t my = (int8_t)my16;
+      Serial.print("[report] t=");
+      Serial.print(now);
+      Serial.print(" dx=");
+      Serial.print((int)mx);
+      Serial.print(" dy=");
+      Serial.println((int)my);
       if (mx || my) {
         sendMouseMove(mx, my);
         accumX -= mx;
