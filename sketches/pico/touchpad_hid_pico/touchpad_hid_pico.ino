@@ -251,12 +251,19 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
-    accumX += velX;
-    accumY += velY;
     if (now - lastReportMs >= REPORT_INTERVAL_MS) {
+      unsigned long dtMs = now - lastReportMs;
       lastReportMs = now;
-      int8_t mx = (int8_t)accumX;
-      int8_t my = (int8_t)accumY;
+      float dt = dtMs / (float)REPORT_INTERVAL_MS;
+      if (dt > 1.5f) dt = 1.0f;
+      accumX += velX * dt;
+      accumY += velY * dt;
+      int16_t mx16 = (int16_t)accumX;
+      int16_t my16 = (int16_t)accumY;
+      mx16 = constrain(mx16, -127, 127);
+      my16 = constrain(my16, -127, 127);
+      int8_t mx = (int8_t)mx16;
+      int8_t my = (int8_t)my16;
       if (mx || my) {
         sendMouseMove(mx, my);
         accumX -= mx;
@@ -269,7 +276,9 @@ void loop() {
     accumScroll += scrollVel;
     if (now - lastScrollReportMs >= REPORT_INTERVAL_MS) {
       lastScrollReportMs = now;
-      int8_t s = (int8_t)accumScroll;
+      int16_t s16 = (int16_t)accumScroll;
+      s16 = constrain(s16, -127, 127);
+      int8_t s = (int8_t)s16;
       if (s) {
         sendMouseWheel(naturalScroll ? s : -s);
         accumScroll -= s;
@@ -1499,6 +1508,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
       velX = velY = 0;
+      lastReportMs = now;
       tapCandidate = true;
       tapStartTime = now;
       tapStartX = x1;

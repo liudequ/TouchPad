@@ -85,12 +85,12 @@ void rebootDevice() {
 }
 /*===== 参数配置区 =====*/
 // 单指移动
-float sensitivity = 0.2f;
-float smoothFactor = 0.3f;
-float accelFactor = 0.002f;
+float sensitivity = 0.6f;
+float smoothFactor = 0.1f;
+float accelFactor = 0.01f;
 float maxAccel = 1.5f;
 const int16_t MAX_DELTA = 30;
-const int16_t MOVE_DEADBAND = 2;
+const int16_t MOVE_DEADBAND = 1;
 
 // 双指滚动
 float scrollSensitivity = 0.00002f;
@@ -423,6 +423,7 @@ void loop() {
       unsigned long dtMs = now - lastReportMs;
       lastReportMs = now;
       float dt = dtMs / (float)REPORT_INTERVAL_MS;
+      if (dt > 1.5f) dt = 1.0f;
       accumX += velX * dt;
       accumY += velY * dt;
       int16_t mx16 = (int16_t)accumX;
@@ -1759,6 +1760,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
       velX = velY = 0;
+      lastReportMs = now;
       tapCandidate = true;
       tapStartTime = now;
       tapStartX = x1;
@@ -1778,6 +1780,9 @@ void handleReport(uint8_t* buf, uint16_t len) {
       tapCandidate = false;
       pendingClick = false;
       mode = MODE_NONE;
+      velX = velY = 0;
+      smoothDx = smoothDy = 0;
+      accumX = accumY = 0;
       return;
     }
     if (tapCandidate) {
@@ -1841,6 +1846,9 @@ void handleReport(uint8_t* buf, uint16_t len) {
     }
     tapCandidate = false;
     mode = MODE_NONE;
+    velX = velY = 0;
+    smoothDx = smoothDy = 0;
+    accumX = accumY = 0;
   }
 }
 
