@@ -337,11 +337,15 @@ void setup() {
   initI2C();
 
   applyDefaults();
-  if (!InternalFS.format()) {
+  bool fsMounted = InternalFS.begin();
+  if (!fsMounted) {
+    // Only format when mount fails to avoid wiping bond keys every boot.
+    if (InternalFS.format()) {
+      fsMounted = InternalFS.begin();
+    }
   }
-  if (InternalFS.begin()) {
+  if (fsMounted) {
     loadConfig();
-  } else {
   }
 
   initUsbHid();
