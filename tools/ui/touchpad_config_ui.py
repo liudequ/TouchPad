@@ -199,6 +199,17 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         rate_layout.addRow("频率(写入)", self.report_rate)
         scroll_layout.addWidget(rate_group)
 
+        power_group = QtWidgets.QGroupBox("蓝牙/省电")
+        power_layout = QtWidgets.QFormLayout(power_group)
+        self.ble_idle_sleep_ms = QtWidgets.QSpinBox()
+        self.ble_idle_sleep_ms.setRange(1000, 3600000)
+        self.ble_idle_sleep_ms.setSingleStep(1000)
+        self.ble_idle_sleep_ms.setSuffix(" ms")
+        self.ble_idle_sleep_ms.setValue(60000)
+        self.ble_idle_sleep_ms.setEnabled(False)
+        power_layout.addRow("空闲休眠触发时长", self.ble_idle_sleep_ms)
+        scroll_layout.addWidget(power_group)
+
         zone_group = QtWidgets.QGroupBox("区域")
         zone_layout = QtWidgets.QFormLayout(zone_group)
         self.top_percent = QtWidgets.QSpinBox()
@@ -278,6 +289,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.load_btn.clicked.connect(self._load)
         self.reset_btn.clicked.connect(self._reset)
         self.boot_btn.clicked.connect(self._boot)
+        self.ble_idle_sleep_ms_supported = False
 
     def _record_shortcut(self, widgets):
         dialog = QtWidgets.QDialog(self)
@@ -382,6 +394,13 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.move_deadband.setValue(int(data["moveDeadband"]))
         if "rate" in data:
             self.report_rate.setValue(int(data["rate"]))
+        if "bleIdleSleepMs" in data:
+            self.ble_idle_sleep_ms_supported = True
+            self.ble_idle_sleep_ms.setEnabled(True)
+            self.ble_idle_sleep_ms.setValue(int(data["bleIdleSleepMs"]))
+        else:
+            self.ble_idle_sleep_ms_supported = False
+            self.ble_idle_sleep_ms.setEnabled(False)
         if "topZonePercent" in data:
             self.top_percent.setValue(int(data["topZonePercent"]))
         if "sideZonePercent" in data:
@@ -474,6 +493,8 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",
             f"SET rate {self.report_rate.value()}",
         ]
+        if self.ble_idle_sleep_ms_supported:
+            cmds.append(f"SET bleIdleSleepMs {self.ble_idle_sleep_ms.value()}")
         cmds += self._zone_set_cmds("leftTop", self.left_top)
         cmds += self._zone_set_cmds("rightTop", self.right_top)
         cmds += self._zone_set_cmds("rightBottom", self.right_bottom)

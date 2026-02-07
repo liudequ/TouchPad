@@ -72,6 +72,7 @@ static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
 static bool useBleWhenUsb = false;
 static bool bleIdleSleepEnabled = false;
+static unsigned long bleIdleSleepMs = IDLE_SLEEP_MS;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
@@ -191,6 +192,7 @@ void applyDefaults() {
   enableNavZones = true;
   useBleWhenUsb = false;
   bleIdleSleepEnabled = false;
+  bleIdleSleepMs = IDLE_SLEEP_MS;
   leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
   rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
   rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
@@ -398,7 +400,7 @@ void loop() {
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
-  if (bleIdleSleepEnabled && useBleTransport() && millis() - lastActivityMs > IDLE_SLEEP_MS) {
+  if (bleIdleSleepEnabled && useBleTransport() && millis() - lastActivityMs > bleIdleSleepMs) {
     enterDeepSleep();
   }
 
@@ -497,6 +499,7 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: PAIRCLR");
     cfgOut->println("CMD: GET useBleWhenUsb");
     cfgOut->println("CMD: GET bleIdleSleepEnabled");
+    cfgOut->println("CMD: GET bleIdleSleepMs");
     return;
   }
 
@@ -536,6 +539,8 @@ void processCommand(const String& line) {
     cfgOut->println(useBleWhenUsb ? "1" : "0");
     cfgOut->print("bleIdleSleepEnabled=");
     cfgOut->println(bleIdleSleepEnabled ? "1" : "0");
+    cfgOut->print("bleIdleSleepMs=");
+    cfgOut->println(bleIdleSleepMs);
     cfgOut->print("leftTopType=");
     cfgOut->println(typeToString(leftTopZone.type));
     cfgOut->print("leftTopButtons=");
@@ -677,6 +682,11 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("bleIdleSleepEnabled")) {
       cfgOut->print("bleIdleSleepEnabled=");
       cfgOut->println(bleIdleSleepEnabled ? "1" : "0");
+      return;
+    }
+    if (key.equalsIgnoreCase("bleIdleSleepMs")) {
+      cfgOut->print("bleIdleSleepMs=");
+      cfgOut->println(bleIdleSleepMs);
       return;
     }
     if (key.equalsIgnoreCase("leftTopType")) {
@@ -1004,6 +1014,16 @@ void processCommand(const String& line) {
         cfgOut->println("OK");
       } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
         bleIdleSleepEnabled = false;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("bleIdleSleepMs")) {
+      long v = valueStr.toInt();
+      if (v >= 1000 && v <= 3600000) {
+        bleIdleSleepMs = (unsigned long)v;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1466,6 +1486,9 @@ bool loadConfig() {
       useBleWhenUsb = (value == "1" || value.equalsIgnoreCase("true"));
     } else if (key.equalsIgnoreCase("bleIdleSleepEnabled")) {
       bleIdleSleepEnabled = (value == "1" || value.equalsIgnoreCase("true"));
+    } else if (key.equalsIgnoreCase("bleIdleSleepMs")) {
+      long v = value.toInt();
+      if (v >= 1000 && v <= 3600000) bleIdleSleepMs = (unsigned long)v;
     } else if (key.equalsIgnoreCase("leftTopType")) {
       ZoneType type;
       if (parseType(value, &type)) leftTopZone.type = type;
@@ -1619,6 +1642,8 @@ bool saveConfig() {
   f.println(useBleWhenUsb ? "1" : "0");
   f.print("bleIdleSleepEnabled=");
   f.println(bleIdleSleepEnabled ? "1" : "0");
+  f.print("bleIdleSleepMs=");
+  f.println(bleIdleSleepMs);
   f.print("leftTopType=");
   f.println(typeToString(leftTopZone.type));
   f.print("leftTopButtons=");
