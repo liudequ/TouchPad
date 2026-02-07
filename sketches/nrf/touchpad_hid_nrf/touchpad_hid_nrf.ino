@@ -90,11 +90,11 @@ void rebootDevice() {
 }
 /*===== 参数配置区 =====*/
 // 单指移动
-float sensitivity = 0.6f;
-float smoothFactor = 0.1f;
+float sensitivity = 0.3f;
+float smoothFactor = 0.5f;
 float accelFactor = 0.01f;
-float maxAccel = 1.5f;
-int16_t maxDelta = 30;
+float maxAccel = 3.0f;
+int16_t maxDelta = 60;
 int16_t moveDeadband = 1;
 
 // 双指滚动
@@ -165,7 +165,7 @@ const int16_t TOUCH_MAX_Y = 1332;
 uint8_t TOP_ZONE_PERCENT = 20;
 uint8_t SIDE_ZONE_PERCENT = 35;
 const float AXIS_SCALE_X = 1.0f;
-const float AXIS_SCALE_Y = (float)TOUCH_MAX_Y / (float)TOUCH_MAX_X;
+const float AXIS_SCALE_Y = 1.0f;
 
 bool enableNavZones = true;
 ZoneBinding leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
@@ -179,11 +179,11 @@ ZoneBinding threeUpBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeDownBinding = { ZONE_NONE, 0, 0, 0 };
 
 void applyDefaults() {
-  sensitivity = 0.6f;
-  smoothFactor = 0.1f;
+  sensitivity = 0.3f;
+  smoothFactor = 0.5f;
   accelFactor = 0.01f;
-  maxAccel = 1.5f;
-  maxDelta = 30;
+  maxAccel = 3.0f;
+  maxDelta = 60;
   moveDeadband = 1;
   scrollSensitivity = 0.00002f;
   TOP_ZONE_PERCENT = 20;
@@ -279,7 +279,7 @@ void initBle() {
   Bluefruit.configPrphConn(kBleMtuMax, kBleEventLen, kBleHvnQueueSize, kBleWrCmdQueueSize);
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
-  Bluefruit.setName("TouchPad");
+  Bluefruit.setName("NiceTouchPad");
   Bluefruit.autoConnLed(true);
   // Request a faster, steadier connection interval (7.5–11.25 ms).
   Bluefruit.Periph.setConnInterval(6, 9);
