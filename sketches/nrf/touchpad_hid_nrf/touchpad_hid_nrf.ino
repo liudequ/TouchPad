@@ -73,14 +73,6 @@ static bool lastUsbMounted = false;
 static bool useBleWhenUsb = true;
 static bool bleIdleSleepEnabled = false;
 
-// Report stats (per second)
-static uint32_t statLastMs = 0;
-static uint32_t statSent = 0;
-static uint32_t statOk = 0;
-static uint32_t statFail = 0;
-static uint32_t statCallTotalUs = 0;
-static uint32_t statCallMaxUs = 0;
-
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
 }
@@ -91,7 +83,6 @@ bool useBleTransport() {
 
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
-  Serial.println("[sys] reboot to DFU");
   delay(20);
   NRF_POWER->GPREGRET = 0xB1;
   NVIC_SystemReset();
@@ -119,7 +110,7 @@ const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
-const uint32_t REPORT_INTERVAL_MS = 16;
+uint32_t reportIntervalMs = 16;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -270,14 +261,11 @@ void updateTransport() {
     }
     if (!useBleWhenUsb) {
       Bluefruit.Advertising.stop();
-      Serial.println("[usb] mounted, BLE stopped");
     } else {
       startAdv();
-      Serial.println("[usb] mounted, BLE active");
     }
   } else {
     startAdv();
-    Serial.println("[usb] unmounted, BLE advertising");
   }
 }
 
@@ -325,13 +313,11 @@ void onConnect(uint16_t conn_handle) {
   if (connection) {
     connection->requestConnectionParameter(12, 0, 400);
   }
-  Serial.println("[ble] connected");
 }
 
 void onDisconnect(uint16_t conn_handle, uint8_t reason) {
   (void)conn_handle;
   (void)reason;
-  Serial.println("[ble] disconnected");
 }
 
 void setup() {
@@ -340,7 +326,6 @@ void setup() {
   while (!Serial && (millis() - serialStart < 2000)) {
     delay(10);
   }
-  Serial.println("[boot] touchpad_hid_nrf start");
 
   // ★★★ 冷启动修复关键 ★★★
   touchColdBoot();
@@ -353,12 +338,10 @@ void setup() {
 
   applyDefaults();
   if (!InternalFS.format()) {
-    Serial.println("[cfg] InternalFS format failed");
   }
   if (InternalFS.begin()) {
     loadConfig();
   } else {
-    Serial.println("[cfg] InternalFS mount failed");
   }
 
   initUsbHid();
@@ -434,10 +417,10 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
-    if (now - lastReportMs >= REPORT_INTERVAL_MS) {
+    if (now - lastReportMs >= reportIntervalMs) {
       unsigned long dtMs = now - lastReportMs;
       lastReportMs = now;
-      float dt = dtMs / (float)REPORT_INTERVAL_MS;
+      float dt = dtMs / (float)reportIntervalMs;
       if (dt > 1.5f) dt = 1.0f;
       accumX += velX * dt;
       accumY += velY * dt;
@@ -457,7 +440,7 @@ void loop() {
 
   if (mode == MODE_DOUBLE) {
     accumScroll += scrollVel;
-    if (now - lastScrollReportMs >= REPORT_INTERVAL_MS) {
+    if (now - lastScrollReportMs >= reportIntervalMs) {
       lastScrollReportMs = now;
       int16_t s16 = (int16_t)accumScroll;
       s16 = constrain(s16, -127, 127);
@@ -470,49 +453,8 @@ void loop() {
   }
 
   if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
-    Serial.println("[tap] single click (double window expired)");
     sendMouseClick(MOUSE_BUTTON_LEFT);
     pendingClick = false;
-  }
-
-  if (now - statLastMs >= 1000) {
-    statLastMs = now;
-    uint32_t avgUs = statSent ? (statCallTotalUs / statSent) : 0;
-    uint32_t targetHz = REPORT_INTERVAL_MS ? (1000 / REPORT_INTERVAL_MS) : 0;
-    Serial.print("[stat] sent=");
-    Serial.print(statSent);
-    Serial.print("/s at ");
-    Serial.print(targetHz);
-    Serial.print(" Hz, ok=");
-    Serial.print(statOk);
-    Serial.print(", fail=");
-    Serial.print(statFail);
-    Serial.print(", avg_us=");
-    Serial.print(avgUs);
-    Serial.print(", max_us=");
-    Serial.print(statCallMaxUs);
-    if (Bluefruit.connected()) {
-      BLEConnection* conn = Bluefruit.Connection(Bluefruit.connHandle());
-      if (conn) {
-        uint16_t interval = conn->getConnectionInterval();
-        Serial.print(", conn_int=");
-        Serial.print(interval);
-        Serial.print(" (");
-        Serial.print(interval * 1.25f, 2);
-        Serial.print("ms)");
-        Serial.print(", latency=");
-        Serial.print(conn->getSlaveLatency());
-        Serial.print(", timeout=");
-        Serial.print(conn->getSupervisionTimeout() * 10);
-        Serial.print("ms");
-      }
-    }
-    Serial.println();
-    statSent = 0;
-    statOk = 0;
-    statFail = 0;
-    statCallTotalUs = 0;
-    statCallMaxUs = 0;
   }
 }
 
@@ -523,7 +465,6 @@ void handleSerial() {
     if (c == '\n') {
       line.trim();
       if (line.length() > 0) {
-        cfgOut = &Serial;
         processCommand(line);
       }
       line = "";
@@ -544,6 +485,15 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: BOOT");
     cfgOut->println("CMD: GET useBleWhenUsb");
     cfgOut->println("CMD: GET bleIdleSleepEnabled");
+    return;
+  }
+
+  if (line.startsWith("RATE ")) {
+    int v = line.substring(5).toInt();
+    if (v >= 10 && v <= 200) {
+      reportIntervalMs = (uint32_t)(1000 / v);
+      if (reportIntervalMs == 0) reportIntervalMs = 1;
+    }
     return;
   }
 
@@ -897,6 +847,17 @@ void processCommand(const String& line) {
         cfgOut->println("OK");
       } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
         enableNavZones = false;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("rate")) {
+      int v = valueStr.toInt();
+      if (v >= 10 && v <= 200) {
+        reportIntervalMs = (uint32_t)(1000 / v);
+        if (reportIntervalMs == 0) reportIntervalMs = 1;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1613,88 +1574,38 @@ void performZoneAction(const ZoneBinding& binding) {
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
-  statSent++;
   if (!useBleTransport()) {
     uint8_t report[5] = { 0, (uint8_t)x, (uint8_t)y, 0, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
-    statOk++;
     return;
   }
   if (!Bluefruit.connected()) return;
-  uint32_t t0 = micros();
-  bool ok = blehid.mouseReport((uint8_t)0, (int8_t)x, (int8_t)y, (int8_t)0, (int8_t)0);
-  uint32_t dt = micros() - t0;
-  statCallTotalUs += dt;
-  if (dt > statCallMaxUs) {
-    statCallMaxUs = dt;
-  }
-  if (ok) {
-    statOk++;
-  } else {
-    statFail++;
-  }
+  blehid.mouseReport((uint8_t)0, (int8_t)x, (int8_t)y, (int8_t)0, (int8_t)0);
 }
 
 void sendMouseWheel(int8_t wheel) {
-  statSent++;
   if (!useBleTransport()) {
     uint8_t report[5] = { 0, 0, 0, (uint8_t)wheel, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
-    statOk++;
     return;
   }
   if (!Bluefruit.connected()) return;
-  uint32_t t0 = micros();
-  bool ok = blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, wheel, (int8_t)0);
-  uint32_t dt = micros() - t0;
-  statCallTotalUs += dt;
-  if (dt > statCallMaxUs) {
-    statCallMaxUs = dt;
-  }
-  if (ok) {
-    statOk++;
-  } else {
-    statFail++;
-  }
+  blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, wheel, (int8_t)0);
 }
 
 void sendMouseClick(uint8_t buttons) {
-  statSent++;
   if (!useBleTransport()) {
     uint8_t report[5] = { buttons, 0, 0, 0, 0 };
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
     delay(5);
     report[0] = 0;
     usb_hid.sendReport(RID_MOUSE, report, sizeof(report));
-    statOk++;
     return;
   }
   if (!Bluefruit.connected()) return;
-  uint32_t t0 = micros();
-  bool ok = blehid.mouseReport((uint8_t)buttons, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
-  uint32_t dt = micros() - t0;
-  statCallTotalUs += dt;
-  if (dt > statCallMaxUs) {
-    statCallMaxUs = dt;
-  }
-  if (ok) {
-    statOk++;
-  } else {
-    statFail++;
-  }
+  blehid.mouseReport((uint8_t)buttons, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
   delay(5);
-  t0 = micros();
-  ok = blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
-  dt = micros() - t0;
-  statCallTotalUs += dt;
-  if (dt > statCallMaxUs) {
-    statCallMaxUs = dt;
-  }
-  if (ok) {
-    statOk++;
-  } else {
-    statFail++;
-  }
+  blehid.mouseReport((uint8_t)0, (int8_t)0, (int8_t)0, (int8_t)0, (int8_t)0);
 }
 
 void sendKeyboard(uint8_t modifier, uint8_t keycode) {
@@ -1920,13 +1831,11 @@ void handleReport(uint8_t* buf, uint16_t len) {
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
           uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
           if (dist <= DOUBLE_TAP_MAX_MOVE) {
-            Serial.println("[tap] double click");
             sendMouseClick(MOUSE_BUTTON_LEFT);
             delay(30);
             sendMouseClick(MOUSE_BUTTON_LEFT);
             pendingClick = false;
           } else {
-            Serial.println("[tap] double click rejected, distance too large");
             sendMouseClick(MOUSE_BUTTON_LEFT);
             pendingClick = true;
             lastTapTime = now;
@@ -1934,15 +1843,11 @@ void handleReport(uint8_t* buf, uint16_t len) {
             lastTapY = tapStartY;
           }
         } else {
-          Serial.println("[tap] pending single click");
           pendingClick = true;
           lastTapTime = now;
           lastTapX = tapStartX;
           lastTapY = tapStartY;
         }
-      } else {
-        Serial.print("[tap] ignore, dt=");
-        Serial.println(dt);
       }
     }
     tapCandidate = false;
