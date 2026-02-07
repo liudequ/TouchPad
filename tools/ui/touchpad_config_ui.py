@@ -160,6 +160,15 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         scroll_group_layout.addRow("滚动灵敏度", self.scroll_sensitivity)
         scroll_layout.addWidget(scroll_group)
 
+        rate_group = QtWidgets.QGroupBox("上报频率")
+        rate_layout = QtWidgets.QFormLayout(rate_group)
+        self.report_rate = QtWidgets.QSpinBox()
+        self.report_rate.setRange(10, 200)
+        self.report_rate.setValue(60)
+        self.report_rate.setSuffix(" Hz")
+        rate_layout.addRow("频率(写入)", self.report_rate)
+        scroll_layout.addWidget(rate_group)
+
         zone_group = QtWidgets.QGroupBox("区域")
         zone_layout = QtWidgets.QFormLayout(zone_group)
         self.top_percent = QtWidgets.QSpinBox()
@@ -413,6 +422,7 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             f"SET topZonePercent {self.top_percent.value()}",
             f"SET sideZonePercent {self.side_percent.value()}",
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",
+            f"SET rate {self.report_rate.value()}",
         ]
         cmds += self._zone_set_cmds("leftTop", self.left_top)
         cmds += self._zone_set_cmds("rightTop", self.right_top)
