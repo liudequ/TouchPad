@@ -247,6 +247,7 @@ void initUsbHid() {
 void startAdv() {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
   Bluefruit.Advertising.addTxPower();
+  Bluefruit.Advertising.addName();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_MOUSE);
   Bluefruit.Advertising.addService(blehid);
   Bluefruit.Advertising.setInterval(32, 244);
@@ -493,6 +494,7 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: LOAD");
     cfgOut->println("CMD: RESET");
     cfgOut->println("CMD: BOOT");
+    cfgOut->println("CMD: PAIRCLR");
     cfgOut->println("CMD: GET useBleWhenUsb");
     cfgOut->println("CMD: GET bleIdleSleepEnabled");
     return;
@@ -1400,6 +1402,16 @@ void processCommand(const String& line) {
   if (line.equalsIgnoreCase("BOOT")) {
     cfgOut->println("OK");
     rebootDevice();
+    return;
+  }
+
+  if (line.equalsIgnoreCase("PAIRCLR")) {
+    if (Bluefruit.connected()) {
+      Bluefruit.disconnect(0);
+      delay(50);
+    }
+    Bluefruit.Periph.clearBonds();
+    cfgOut->println("OK");
     return;
   }
 
