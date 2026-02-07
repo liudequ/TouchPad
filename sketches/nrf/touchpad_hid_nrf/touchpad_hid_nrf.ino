@@ -70,7 +70,7 @@ extern const uint32_t g_ADigitalPinMap[];
 
 static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
-static bool useBleWhenUsb = true;
+static bool useBleWhenUsb = false;
 static bool bleIdleSleepEnabled = false;
 
 bool isUsbMounted() {
@@ -183,7 +183,7 @@ void applyDefaults() {
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
   enableNavZones = true;
-  useBleWhenUsb = true;
+  useBleWhenUsb = false;
   bleIdleSleepEnabled = false;
   leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
   rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
