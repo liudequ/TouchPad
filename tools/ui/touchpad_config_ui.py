@@ -160,6 +160,36 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         scroll_group_layout.addRow("滚动灵敏度", self.scroll_sensitivity)
         scroll_layout.addWidget(scroll_group)
 
+        single_group = QtWidgets.QGroupBox("单指")
+        single_layout = QtWidgets.QFormLayout(single_group)
+        self.sensitivity = QtWidgets.QDoubleSpinBox()
+        self.sensitivity.setDecimals(3)
+        self.sensitivity.setSingleStep(0.01)
+        self.sensitivity.setRange(0.01, 5.0)
+        single_layout.addRow("灵敏度", self.sensitivity)
+        self.smooth_factor = QtWidgets.QDoubleSpinBox()
+        self.smooth_factor.setDecimals(3)
+        self.smooth_factor.setSingleStep(0.01)
+        self.smooth_factor.setRange(0.0, 1.0)
+        single_layout.addRow("平滑系数", self.smooth_factor)
+        self.accel_factor = QtWidgets.QDoubleSpinBox()
+        self.accel_factor.setDecimals(3)
+        self.accel_factor.setSingleStep(0.01)
+        self.accel_factor.setRange(0.0, 1.0)
+        single_layout.addRow("加速系数", self.accel_factor)
+        self.max_accel = QtWidgets.QDoubleSpinBox()
+        self.max_accel.setDecimals(2)
+        self.max_accel.setSingleStep(0.1)
+        self.max_accel.setRange(0.0, 10.0)
+        single_layout.addRow("最大加速", self.max_accel)
+        self.max_delta = QtWidgets.QSpinBox()
+        self.max_delta.setRange(1, 200)
+        single_layout.addRow("单次最大位移", self.max_delta)
+        self.move_deadband = QtWidgets.QSpinBox()
+        self.move_deadband.setRange(0, 20)
+        single_layout.addRow("移动死区", self.move_deadband)
+        scroll_layout.addWidget(single_group)
+
         rate_group = QtWidgets.QGroupBox("上报频率")
         rate_layout = QtWidgets.QFormLayout(rate_group)
         self.report_rate = QtWidgets.QSpinBox()
@@ -338,6 +368,20 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         data = self.client.get_all()
         if "scrollSensitivity" in data:
             self.scroll_sensitivity.setValue(float(data["scrollSensitivity"]))
+        if "sensitivity" in data:
+            self.sensitivity.setValue(float(data["sensitivity"]))
+        if "smoothFactor" in data:
+            self.smooth_factor.setValue(float(data["smoothFactor"]))
+        if "accelFactor" in data:
+            self.accel_factor.setValue(float(data["accelFactor"]))
+        if "maxAccel" in data:
+            self.max_accel.setValue(float(data["maxAccel"]))
+        if "maxDelta" in data:
+            self.max_delta.setValue(int(data["maxDelta"]))
+        if "moveDeadband" in data:
+            self.move_deadband.setValue(int(data["moveDeadband"]))
+        if "rate" in data:
+            self.report_rate.setValue(int(data["rate"]))
         if "topZonePercent" in data:
             self.top_percent.setValue(int(data["topZonePercent"]))
         if "sideZonePercent" in data:
@@ -419,6 +463,12 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             return
         cmds = [
             f"SET scrollSensitivity {self.scroll_sensitivity.value():.8f}",
+            f"SET sensitivity {self.sensitivity.value():.3f}",
+            f"SET smoothFactor {self.smooth_factor.value():.3f}",
+            f"SET accelFactor {self.accel_factor.value():.3f}",
+            f"SET maxAccel {self.max_accel.value():.2f}",
+            f"SET maxDelta {self.max_delta.value()}",
+            f"SET moveDeadband {self.move_deadband.value()}",
             f"SET topZonePercent {self.top_percent.value()}",
             f"SET sideZonePercent {self.side_percent.value()}",
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",

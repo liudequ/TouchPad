@@ -94,8 +94,8 @@ float sensitivity = 0.6f;
 float smoothFactor = 0.1f;
 float accelFactor = 0.01f;
 float maxAccel = 1.5f;
-const int16_t MAX_DELTA = 30;
-const int16_t MOVE_DEADBAND = 1;
+int16_t maxDelta = 30;
+int16_t moveDeadband = 1;
 
 // 双指滚动
 float scrollSensitivity = 0.00002f;
@@ -179,6 +179,12 @@ ZoneBinding threeUpBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeDownBinding = { ZONE_NONE, 0, 0, 0 };
 
 void applyDefaults() {
+  sensitivity = 0.6f;
+  smoothFactor = 0.1f;
+  accelFactor = 0.01f;
+  maxAccel = 1.5f;
+  maxDelta = 30;
+  moveDeadband = 1;
   scrollSensitivity = 0.00002f;
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
@@ -502,6 +508,20 @@ void processCommand(const String& line) {
   }
 
   if (line.equalsIgnoreCase("GET")) {
+    cfgOut->print("sensitivity=");
+    cfgOut->println(sensitivity, 6);
+    cfgOut->print("smoothFactor=");
+    cfgOut->println(smoothFactor, 6);
+    cfgOut->print("accelFactor=");
+    cfgOut->println(accelFactor, 6);
+    cfgOut->print("maxAccel=");
+    cfgOut->println(maxAccel, 6);
+    cfgOut->print("maxDelta=");
+    cfgOut->println(maxDelta);
+    cfgOut->print("moveDeadband=");
+    cfgOut->println(moveDeadband);
+    cfgOut->print("rate=");
+    cfgOut->println(reportIntervalMs ? (1000 / reportIntervalMs) : 0);
     cfgOut->print("scrollSensitivity=");
     cfgOut->println(scrollSensitivity, 8);
     cfgOut->print("topZonePercent=");
@@ -595,6 +615,41 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("scrollSensitivity")) {
       cfgOut->print("scrollSensitivity=");
       cfgOut->println(scrollSensitivity, 8);
+      return;
+    }
+    if (key.equalsIgnoreCase("sensitivity")) {
+      cfgOut->print("sensitivity=");
+      cfgOut->println(sensitivity, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("smoothFactor")) {
+      cfgOut->print("smoothFactor=");
+      cfgOut->println(smoothFactor, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("accelFactor")) {
+      cfgOut->print("accelFactor=");
+      cfgOut->println(accelFactor, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("maxAccel")) {
+      cfgOut->print("maxAccel=");
+      cfgOut->println(maxAccel, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("maxDelta")) {
+      cfgOut->print("maxDelta=");
+      cfgOut->println(maxDelta);
+      return;
+    }
+    if (key.equalsIgnoreCase("moveDeadband")) {
+      cfgOut->print("moveDeadband=");
+      cfgOut->println(moveDeadband);
+      return;
+    }
+    if (key.equalsIgnoreCase("rate")) {
+      cfgOut->print("rate=");
+      cfgOut->println(reportIntervalMs ? (1000 / reportIntervalMs) : 0);
       return;
     }
     if (key.equalsIgnoreCase("topZonePercent")) {
@@ -802,7 +857,8 @@ void processCommand(const String& line) {
       cfgOut->println(threeSwipeCooldown);
       return;
     }
-    cfgOut->println("ERR: key");
+    cfgOut->print("ERR: key ");
+    cfgOut->println(key);
     return;
   }
 
@@ -819,6 +875,66 @@ void processCommand(const String& line) {
       float v = valueStr.toFloat();
       if (v > 0.0f) {
         scrollSensitivity = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("sensitivity")) {
+      float v = valueStr.toFloat();
+      if (v > 0.0f && v <= 5.0f) {
+        sensitivity = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("smoothFactor")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 1.0f) {
+        smoothFactor = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("accelFactor")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 1.0f) {
+        accelFactor = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("maxAccel")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 10.0f) {
+        maxAccel = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("maxDelta")) {
+      int v = valueStr.toInt();
+      if (v >= 1 && v <= 200) {
+        maxDelta = (int16_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("moveDeadband")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 20) {
+        moveDeadband = (int16_t)v;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1252,7 +1368,8 @@ void processCommand(const String& line) {
       }
       return;
     }
-    cfgOut->println("ERR: key");
+    cfgOut->print("ERR: key ");
+    cfgOut->println(key);
     return;
   }
 
@@ -1307,6 +1424,24 @@ bool loadConfig() {
     if (key.equalsIgnoreCase("scrollSensitivity")) {
       float val = value.toFloat();
       if (val > 0.0f) scrollSensitivity = val;
+    } else if (key.equalsIgnoreCase("sensitivity")) {
+      float val = value.toFloat();
+      if (val > 0.0f) sensitivity = val;
+    } else if (key.equalsIgnoreCase("smoothFactor")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 1.0f) smoothFactor = val;
+    } else if (key.equalsIgnoreCase("accelFactor")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 1.0f) accelFactor = val;
+    } else if (key.equalsIgnoreCase("maxAccel")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 10.0f) maxAccel = val;
+    } else if (key.equalsIgnoreCase("maxDelta")) {
+      int v = value.toInt();
+      if (v >= 1 && v <= 200) maxDelta = (int16_t)v;
+    } else if (key.equalsIgnoreCase("moveDeadband")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 20) moveDeadband = (int16_t)v;
     } else if (key.equalsIgnoreCase("topZonePercent")) {
       int v = value.toInt();
       if (v >= 5 && v <= 50) TOP_ZONE_PERCENT = (uint8_t)v;
@@ -1427,6 +1562,12 @@ bool loadConfig() {
     } else if (key.equalsIgnoreCase("threeSwipeCooldown")) {
       int v = value.toInt();
       if (v >= 0 && v <= 2000) threeSwipeCooldown = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("rate")) {
+      int v = value.toInt();
+      if (v >= 10 && v <= 200) {
+        reportIntervalMs = (uint32_t)(1000 / v);
+        if (reportIntervalMs == 0) reportIntervalMs = 1;
+      }
     }
   }
   f.close();
@@ -1444,6 +1585,18 @@ bool saveConfig() {
   }
   f.print("scrollSensitivity=");
   f.println(scrollSensitivity, 8);
+  f.print("sensitivity=");
+  f.println(sensitivity, 6);
+  f.print("smoothFactor=");
+  f.println(smoothFactor, 6);
+  f.print("accelFactor=");
+  f.println(accelFactor, 6);
+  f.print("maxAccel=");
+  f.println(maxAccel, 6);
+  f.print("maxDelta=");
+  f.println(maxDelta);
+  f.print("moveDeadband=");
+  f.println(moveDeadband);
   f.print("topZonePercent=");
   f.println(TOP_ZONE_PERCENT);
   f.print("sideZonePercent=");
@@ -1526,6 +1679,8 @@ bool saveConfig() {
   f.println(threeSwipeTimeout);
   f.print("threeSwipeCooldown=");
   f.println(threeSwipeCooldown);
+  f.print("rate=");
+  f.println(reportIntervalMs ? (1000 / reportIntervalMs) : 0);
   f.close();
   return true;
 }
@@ -1699,7 +1854,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
   if (f1 && f2) {
     if (mode == MODE_DOUBLE) {
       int16_t dy = ((y1 - lastY1) + (y2 - lastY2)) / 2;
-      dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
+      dy = constrain(dy, -maxDelta, maxDelta);
       if (abs(dy) <= SCROLL_DEADBAND) dy = 0;
       float v = dy * scrollSensitivity;
       smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
@@ -1732,10 +1887,10 @@ void handleReport(uint8_t* buf, uint16_t len) {
     if (mode == MODE_SINGLE) {
       int16_t dx = x1 - lastX1;
       int16_t dy = y1 - lastY1;
-      dx = constrain(dx, -MAX_DELTA, MAX_DELTA);
-      dy = constrain(dy, -MAX_DELTA, MAX_DELTA);
-      if (abs(dx) <= MOVE_DEADBAND) dx = 0;
-      if (abs(dy) <= MOVE_DEADBAND) dy = 0;
+      dx = constrain(dx, -maxDelta, maxDelta);
+      dy = constrain(dy, -maxDelta, maxDelta);
+      if (abs(dx) <= moveDeadband) dx = 0;
+      if (abs(dy) <= moveDeadband) dy = 0;
 
       if (tapCandidate) {
         uint16_t dist = abs(x1 - tapStartX) + abs(y1 - tapStartY);
