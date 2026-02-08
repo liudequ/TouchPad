@@ -65,6 +65,12 @@ void onConnect(uint16_t conn_handle);
 void onDisconnect(uint16_t conn_handle, uint8_t reason);
 void startAdv();
 void enterDeepSleep();
+void initStatusLed();
+void setLedPatternActive();
+void setLedPatternIdleLight();
+void setLedPatternIdleMedium();
+void setLedPatternOff();
+void updateStatusLed(unsigned long now);
 
 #if defined(ARDUINO_ARCH_NRF52)
 extern const uint32_t g_ADigitalPinMap[];
@@ -88,6 +94,24 @@ enum PowerStage {
 static PowerStage powerStage = POWER_ACTIVE;
 static bool advSuppressedByIdle = false;
 
+enum LedPattern {
+  LED_PATTERN_OFF = 0,
+  LED_PATTERN_ACTIVE_HOLD = 1,
+  LED_PATTERN_IDLE_LIGHT = 2,
+  LED_PATTERN_IDLE_MEDIUM = 3,
+};
+
+static LedPattern ledPattern = LED_PATTERN_OFF;
+static unsigned long ledPatternStartMs = 0;
+static bool ledStateOn = false;
+
+#if defined(LED_STATE_ON)
+static const uint8_t kLedOnLevel = LED_STATE_ON;
+#else
+static const uint8_t kLedOnLevel = HIGH;
+#endif
+static const uint8_t kLedOffLevel = (kLedOnLevel == HIGH) ? LOW : HIGH;
+
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
 }
@@ -103,6 +127,66 @@ void enterIdleLightStage();
 void enterIdleMediumStage();
 void handleIdlePower(unsigned long now);
 void markActivity();
+
+void writeStatusLed(bool on) {
+  if (ledStateOn == on) return;
+  ledStateOn = on;
+  digitalWrite(LED_BUILTIN, on ? kLedOnLevel : kLedOffLevel);
+}
+
+void initStatusLed() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  writeStatusLed(false);
+  ledPattern = LED_PATTERN_OFF;
+  ledPatternStartMs = millis();
+}
+
+void setLedPatternActive() {
+  ledPattern = LED_PATTERN_ACTIVE_HOLD;
+  ledPatternStartMs = millis();
+  writeStatusLed(true);
+}
+
+void setLedPatternIdleLight() {
+  ledPattern = LED_PATTERN_IDLE_LIGHT;
+  ledPatternStartMs = millis();
+}
+
+void setLedPatternIdleMedium() {
+  ledPattern = LED_PATTERN_IDLE_MEDIUM;
+  ledPatternStartMs = millis();
+}
+
+void setLedPatternOff() {
+  ledPattern = LED_PATTERN_OFF;
+  ledPatternStartMs = millis();
+  writeStatusLed(false);
+}
+
+void updateStatusLed(unsigned long now) {
+  unsigned long phase;
+  switch (ledPattern) {
+    case LED_PATTERN_ACTIVE_HOLD:
+      if (now - ledPatternStartMs < 1000) {
+        writeStatusLed(true);
+      } else {
+        writeStatusLed(false);
+      }
+      break;
+    case LED_PATTERN_IDLE_LIGHT:
+      phase = (now - ledPatternStartMs) % 2000;
+      writeStatusLed(phase < 60);
+      break;
+    case LED_PATTERN_IDLE_MEDIUM:
+      phase = (now - ledPatternStartMs) % 4000;
+      writeStatusLed((phase < 60) || (phase >= 240 && phase < 300));
+      break;
+    case LED_PATTERN_OFF:
+    default:
+      writeStatusLed(false);
+      break;
+  }
+}
 
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
@@ -219,6 +303,7 @@ void leaveIdlePowerStage() {
   if (powerStage == POWER_ACTIVE && !advSuppressedByIdle) return;
   powerStage = POWER_ACTIVE;
   advSuppressedByIdle = false;
+  setLedPatternActive();
   unsigned long now = millis();
   lastReportMs = now;
   lastScrollReportMs = now;
@@ -231,6 +316,7 @@ void leaveIdlePowerStage() {
 void enterIdleLightStage() {
   if (powerStage >= POWER_IDLE_LIGHT) return;
   powerStage = POWER_IDLE_LIGHT;
+  setLedPatternIdleLight();
   if (!Bluefruit.connected()) {
     Bluefruit.Advertising.stop();
     advSuppressedByIdle = true;
@@ -240,6 +326,7 @@ void enterIdleLightStage() {
 void enterIdleMediumStage() {
   if (powerStage >= POWER_IDLE_MEDIUM) return;
   powerStage = POWER_IDLE_MEDIUM;
+  setLedPatternIdleMedium();
   if (Bluefruit.connected()) {
     Bluefruit.disconnect(0);
     delay(50);
@@ -363,8 +450,12 @@ void updateTransport() {
   if (usbMounted == lastUsbMounted) return;
   lastUsbMounted = usbMounted;
   if (usbMounted) {
+    bool leavingIdle = (powerStage != POWER_ACTIVE) || advSuppressedByIdle;
     advSuppressedByIdle = false;
     powerStage = POWER_ACTIVE;
+    if (leavingIdle) {
+      setLedPatternActive();
+    }
   }
 
   if (usbMounted) {
@@ -387,7 +478,7 @@ void initBle() {
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
   Bluefruit.setName("NiceTouchPad");
-  Bluefruit.autoConnLed(true);
+  Bluefruit.autoConnLed(false);
   // Request a faster, steadier connection interval (7.5–11.25 ms).
   Bluefruit.Periph.setConnInterval(6, 9);
 
@@ -405,6 +496,13 @@ void initBle() {
 
 void enterDeepSleep() {
 #if defined(ARDUINO_ARCH_NRF52)
+  setLedPatternOff();
+  for (uint8_t i = 0; i < 3; i++) {
+    writeStatusLed(true);
+    delay(80);
+    writeStatusLed(false);
+    delay(80);
+  }
   if (Bluefruit.connected()) {
     Bluefruit.disconnect(0);
     delay(200);
@@ -449,6 +547,7 @@ void setup() {
 
   // INT 必须提前配置，防止悬空
   pinMode(INT_PIN, INPUT_PULLUP);
+  initStatusLed();
 
   // I2C 初始化（延后）
   initI2C();
@@ -469,6 +568,7 @@ void setup() {
   initBle();
   updateTransport();
   markActivity();
+  setLedPatternActive();
 }
 
 const char* typeToString(ZoneType type) {
@@ -509,8 +609,10 @@ void loop() {
     readInputReport();
   }
   unsigned long now = millis();
+  updateStatusLed(now);
   handleIdlePower(now);
   now = millis();
+  updateStatusLed(now);
 
   /*单指超时释放*/
   if (mode == MODE_SINGLE && now - lastTouchTime > RELEASE_TIMEOUT) {
