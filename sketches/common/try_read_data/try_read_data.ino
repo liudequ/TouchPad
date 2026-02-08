@@ -52,7 +52,7 @@ void setup()
     delay(10);
   }
 
-  Wire.begin();        // Pico 默认 I2C0
+  Wire.begin();        // 默认 I2C 总线
   Wire.setClock(400000); // 400kHz，触摸 IC 常用
 
   Serial.println("Touch blind read start...");

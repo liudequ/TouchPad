@@ -15,7 +15,6 @@
 - 省电策略已包含空闲分级与相关配置项（`bleIdle*`、`lightIdleRate`）。
 
 ## 迁移期间关键结论（保留）
-- RP2040/Pico 不支持原生 BLE，切换 BLE HID 需更换主控或外接 BLE 模块。
 - nRF52840 生态成熟，BLE HID 实用性较好。
 
 ## 硬件与功耗备忘
