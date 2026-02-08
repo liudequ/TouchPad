@@ -69,6 +69,25 @@ PAIRCLR
 - 四指阈值：`fourSwipeThresholdX`、`fourSwipeThresholdY`、`fourSwipeTimeout`、`fourSwipeCooldown`
 - 连接/省电：`useBleWhenUsb`、`bleIdleSleepEnabled`、`bleIdleLightMs`、`bleIdleMediumMs`、`bleIdleSleepMs`、`lightIdleRate`
 
+## 三阶段省电策略
+当 `bleIdleSleepEnabled=1` 且使用 BLE 传输时，固件会按空闲时长进入三阶段省电：
+
+1. 第一阶段（轻度空闲）  
+触发条件：空闲时长 >= `bleIdleLightMs`  
+行为：进入轻度省电状态，降低活跃度并按 `lightIdleRate` 控制上报节奏。
+
+2. 第二阶段（中度空闲）  
+触发条件：空闲时长 >= `bleIdleMediumMs`  
+行为：进入更深一层省电状态，断开当前 BLE 连接并停止广播。
+
+3. 第三阶段（深度空闲）  
+触发条件：空闲时长 >= `bleIdleSleepMs`  
+行为：进入深度睡眠，进一步降低功耗，等待唤醒。
+
+说明：
+- 阈值需满足：`bleIdleLightMs < bleIdleMediumMs < bleIdleSleepMs`。固件会在内部做最小间隔校正。
+- 任意新的触摸操作会更新活动时间并退出空闲阶段，恢复正常工作状态。
+
 区域类型可选值：`NONE`、`MOUSE`、`KEYBOARD`。
 
 常用修饰键位掩码（可组合）：`CTRL=1`、`SHIFT=2`、`ALT=4`、`GUI=8`。
