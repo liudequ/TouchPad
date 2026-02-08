@@ -33,6 +33,7 @@
 - `models/touchpad_case.scad`：触摸板外壳 OpenSCAD 源文件。
 - `models/touchpad_case.stl`：触摸板外壳可打印 STL 文件。
 - `models/case_notes.md`：外壳设计与打印参数说明。
+- 备注：当前 3D 模型较粗糙，主要用于尺寸与装配验证，实际空间有很大的冗余。
 
 ## 构建、测试与开发命令
 当前推荐流程（nice!nano v2）：
