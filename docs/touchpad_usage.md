@@ -1,157 +1,112 @@
-# 触摸板使用说明
+# 触摸板使用说明（nRF 版）
 
-本项目将触摸板输入转换为 USB 鼠标输出。按以下步骤连接与操作。
+本项目将触摸板输入转换为 HID 输入设备输出，支持 USB 与 BLE。
 
-## 硬件连接
-- 触摸板 I2C：`SDA=GP4`、`SCL=GP5`
-- 中断引脚：`INT=GP10`（上拉）
-- 使能引脚：`TP_EN=GP9`
+## 硬件连接（nice!nano v2 / SuperMini nRF52840）
+- 触摸板 I2C：`SDA=D6`、`SCL=D7`
+- 中断引脚：`INT=D8`（上拉输入）
+- 使能引脚：`TP_EN=D9`
 - 设备 I2C 地址：`0x2C`
 
-如需修改引脚或地址，编辑 `sketches/pico/touchpad_hid_pico/touchpad_hid_pico.ino` 顶部的宏定义。
+如需修改引脚或地址，编辑 `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino` 顶部宏定义。
 
-## 烧录步骤
-1. 在 Arduino IDE 中打开 `sketches/pico/touchpad_hid_pico/touchpad_hid_pico.ino`。
-2. 选择板卡与串口。
-3. Tools → Flash Size 选择 `Sketch 1M FS 1M`（用于 LittleFS 配置存储）。
-3. 点击 **Upload** 上传固件。
+## 固件烧录流程（推荐）
+1. 在 Arduino IDE 中打开 `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`。
+2. 选择板卡与串口，执行“导出编译二进制文件”（Export Compiled Binary）。
+3. 在仓库根目录运行：
+   ```bash
+   tools/make_uf2_latest_nicenano_v2.sh
+   ```
+4. 将生成的 `.uf2` 文件复制到开发板挂载出的 UF2/U 盘中完成刷写。
 
 ## 操作方式
 - 单指滑动：移动鼠标指针。
 - 双指上下滑动：滚轮滚动。
 - 单指轻触抬起：单击。
-- 双击：在短时间内连续两次轻触抬起。
-- 左上角轻触：后退（Alt+Left）。
-- 右上角轻触：前进（Alt+Right）。
-- 右下角轻触：右键。
-- 三指左右/上下滑动：触发配置绑定的动作。
+- 双击：在时间窗口内连续两次轻触抬起。
+- 左上角轻触：后退（默认 Alt+Left）。
+- 右上角轻触：前进（默认 Alt+Right）。
+- 右下角轻触：右键（默认）。
+- 左下角轻触：默认未绑定，可在配置中自定义。
+- 三指左右/上下滑动：触发配置绑定动作。
 
 ## 区域说明
-当前区域划分为上边 20% 高度、左右各 35% 宽度：
+当前区域划分为上边 `20%` 高度、左右各 `35%` 宽度。
 - 左上角区域：后退
 - 右上角区域：前进
 - 右下角区域：右键
-如需调整区域大小，修改 `TOP_ZONE_PERCENT` 和 `SIDE_ZONE_PERCENT`。
+- 左下角区域：默认不启用
 
-示意图（非比例）：
+可通过参数 `topZonePercent`、`sideZonePercent`、`enableNavZones` 调整。
+
+## 串口配置（当前固件）
+固件支持串口命令配置并持久化到板载文件系统。
+
+常用命令：
+```text
+HELP
+GET
+GET <key>
+SET <key> <value>
+SAVE
+LOAD
+RESET
+PAIRCLR
 ```
-┌──────────────────────────────┐
-│  后退            前进         │  上边 20%
-│  (左上)         (右上)        │
-│                              │
-│                              │
-│                              │
-│                 右键         │  下边 20%
-│                (右下)        │
-└──────────────────────────────┘
-   左 35%                 右 35%
-```
 
-## 坐标范围记录
-实测坐标范围如下（用于区域划分与调试）：
-- 左上角：`(0, 0)`
-- 右下角：`(2628, 1332)`
-
-## 调参建议
-如需调整手感，可修改以下参数：
-- 移动相关：`sensitivity`、`smoothFactor`、`accelFactor`
-- 滚轮相关：`scrollSensitivity`、`scrollSmoothFactor`
-- 点击相关：`TAP_MAX_MS`、`DOUBLE_TAP_WINDOW`
-- 双击距离：`DOUBLE_TAP_MAX_MOVE`（两次点击位置的距离阈值）
-- 方向相关：`naturalScroll`（`true` 为自然滚动，`false` 为传统滚动）
-- 区域相关：`TOP_ZONE_PERCENT`、`SIDE_ZONE_PERCENT`、`enableNavZones`
-
-## 串口配置（区域与滚动）
-当前支持通过串口修改并保存以下参数：
-- `scrollSensitivity`
-- `topZonePercent`（上边高度百分比，5~50）
-- `sideZonePercent`（左右宽度百分比，5~50）
-- `enableNavZones`（0/1）
-- `leftTopType` / `rightTopType` / `rightBottomType` / `leftBottomType`
-- `leftTopButtons` / `rightTopButtons` / `rightBottomButtons` / `leftBottomButtons`
-- `leftTopModifier` / `rightTopModifier` / `rightBottomModifier` / `leftBottomModifier`
-- `leftTopKey` / `rightTopKey` / `rightBottomKey` / `leftBottomKey`
-- `threeLeftType` / `threeRightType`
-- `threeLeftButtons` / `threeRightButtons`
-- `threeLeftModifier` / `threeRightModifier`
-- `threeLeftKey` / `threeRightKey`
-- `threeUpType` / `threeDownType`
-- `threeUpButtons` / `threeDownButtons`
-- `threeUpModifier` / `threeDownModifier`
-- `threeUpKey` / `threeDownKey`
-- `threeSwipeThresholdX` / `threeSwipeThresholdY` / `threeSwipeTimeout` / `threeSwipeCooldown`
+常见参数：
+- 移动/滚动：`sensitivity`、`smoothFactor`、`accelFactor`、`maxAccel`、`maxDelta`、`moveDeadband`、`scrollSensitivity`
+- 区域：`topZonePercent`、`sideZonePercent`、`enableNavZones`
+- 四角动作：`leftTop*`、`rightTop*`、`rightBottom*`、`leftBottom*`
+- 三指动作：`threeLeft*`、`threeRight*`、`threeUp*`、`threeDown*`
+- 三指阈值：`threeSwipeThresholdX`、`threeSwipeThresholdY`、`threeSwipeTimeout`、`threeSwipeCooldown`
+- 连接/省电：`useBleWhenUsb`、`bleIdleSleepEnabled`、`bleIdleLightMs`、`bleIdleMediumMs`、`bleIdleSleepMs`、`lightIdleRate`
 
 区域类型可选值：`NONE`、`MOUSE`、`KEYBOARD`。
 
 常用修饰键位掩码（可组合）：`CTRL=1`、`SHIFT=2`、`ALT=4`、`GUI=8`。
-
 常用按键码示例：`RIGHT=79`、`LEFT=80`、`DOWN=81`、`UP=82`。
 
 示例：
-```
-HELP
+```text
 GET
-GET leftTopType
 SET scrollSensitivity 0.00002
 SET leftBottomType MOUSE
 SET leftBottomButtons 2
 SET threeLeftType KEYBOARD
 SET threeLeftModifier 5
 SET threeLeftKey 80
-SET threeUpType KEYBOARD
-SET threeUpModifier 5
-SET threeUpKey 82
 SET sideZonePercent 35
 SAVE
-LOAD
-RESET
 ```
-说明：
-- `SET` 修改内存中的参数，`SAVE` 写入 Flash，`LOAD` 从 Flash 读取。
-- 串口波特率固定为 `115200`。
-
-## 依赖说明
-RP2040 使用 TinyUSB 复合 HID（鼠标/键盘）。请确保可用的 `Adafruit_TinyUSB` 支持。
 
 ## 上位机 UI（Python）
-可以使用 `tools/ui/touchpad_config_ui.py` 打开配置界面。依赖：
+可使用 `tools/ui/touchpad_config_ui.py` 图形化配置。
+
+依赖：
 - `pyserial`
 - `PySide6`
-- `bleak`（BLE 通道）
+- `bleak`（当前 nRF 固件仅保留 USB 串口调参，BLE 调参已移除）
 
-UI 支持“录制快捷键”，按下组合键后会自动填充 `Type/Modifier/Key`（界面不提供手动输入键码）。
-
-运行示例：
-```
+运行：
+```bash
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -r tools/ui/requirements.txt
 python3 tools/ui/touchpad_config_ui.py
 ```
 
-也可以直接运行脚本：
-```
+或直接：
+```bash
 tools/ui/run_ui.sh
 ```
 
-如果需要双击启动，可使用：
-- `tools/ui/touchpad_config.desktop`
-
 ## 串口权限（Linux）
-首次在新机器连接时，可能遇到 `/dev/ttyACM0` 权限不足。可添加 udev 规则并加入 `dialout` 组：
-```
-sudo tee /etc/udev/rules.d/99-adafruit-pico.rules >/dev/null <<'EOF'
-SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", ATTRS{idProduct}=="cafe", MODE="0660", GROUP="dialout"
-EOF
+首次在新机器连接时，若遇到 `/dev/ttyACM0` 权限不足，可将当前用户加入 `dialout` 组：
 
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-确认当前用户在 `dialout` 组，不在则加入并注销/重登：
-```
+```bash
 groups
 sudo usermod -aG dialout $USER
 ```
 
-修改后重新编译上传即可生效。
+执行后注销并重新登录。
