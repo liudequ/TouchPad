@@ -15,17 +15,24 @@
 - `sketches/nrf/serial_alive_nicenano/serial_alive_nicenano.ino`
 
 文档放在 `docs/`。每个草图自包含、互不依赖。
+3D 模型放在 `models/`，用于外壳设计与打印参考。
 
 ## 文档说明（docs）
 - `docs/touchpad_usage.md`：nRF 触摸板使用说明（接线、烧录、操作、串口命令与 UI 配置）。
 - `docs/arduino_ide_supermini_setup.md`：Arduino IDE 本地板卡配置与 UF2 刷写流程说明。
 - `docs/ble_conn_test.md`：`ble_conn_test` 草图的人工测试步骤与预期结果。
 - `docs/bluetooth_migration_notes.md`：蓝牙迁移历史记录与现状说明（含 BLE 抓包分析方法）。
+- `docs/bom.md`：触摸板项目物料清单（BOM）与接线速查。
 - `docs/stability_tuning.md`：手感稳定性与防抖调参思路清单。
 - `docs/fpc_pinout.md`：触摸板 FPC 转接板引脚定义（nRF 方案）。
 - `docs/schematic_nice_nano_v2.png`：nice!nano v2 原理图参考图。
 - `docs/Promicro NRF52840开发板 兼容nice!nano V2.0 带蓝牙 充电管理-淘宝网.png`：开发板商品页截图参考。
 - `docs/nRF52840_PS_v1.1.pdf`：nRF52840 官方规格书（参考资料）。
+
+## 模型说明（models）
+- `models/touchpad_case.scad`：触摸板外壳 OpenSCAD 源文件。
+- `models/touchpad_case.stl`：触摸板外壳可打印 STL 文件。
+- `models/case_notes.md`：外壳设计与打印参数说明。
 
 ## 构建、测试与开发命令
 当前推荐流程（nice!nano v2）：

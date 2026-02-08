@@ -9,6 +9,7 @@
 - 设备 I2C 地址：`0x2C`
 
 如需修改引脚或地址，编辑 `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino` 顶部宏定义。
+物料清单见 `docs/bom.md`。
 
 ## 固件烧录流程（推荐）
 1. 在 Arduino IDE 中打开 `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`。
