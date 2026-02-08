@@ -23,6 +23,7 @@
 - `docs/ble_conn_test.md`：`ble_conn_test` 草图的人工测试步骤与预期结果。
 - `docs/bluetooth_migration_notes.md`：蓝牙迁移历史记录与现状说明（含 BLE 抓包分析方法）。
 - `docs/bom.md`：触摸板项目物料清单（BOM）与接线速查。
+- `docs/video_intro_flow.md`：触摸板介绍视频的分段流程与口播参考。
 - `docs/stability_tuning.md`：手感稳定性与防抖调参思路清单。
 - `docs/fpc_pinout.md`：触摸板 FPC 转接板引脚定义（nRF 方案）。
 - `docs/schematic_nice_nano_v2.png`：nice!nano v2 原理图参考图。
