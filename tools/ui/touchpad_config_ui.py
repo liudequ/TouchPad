@@ -318,13 +318,11 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.save_btn = QtWidgets.QPushButton("保存")
         self.load_btn = QtWidgets.QPushButton("加载")
         self.reset_btn = QtWidgets.QPushButton("恢复默认")
-        self.boot_btn = QtWidgets.QPushButton("进入BOOTSEL")
         ops_layout.addWidget(self.apply_btn)
         ops_layout.addWidget(self.refresh_values_btn)
         ops_layout.addWidget(self.save_btn)
         ops_layout.addWidget(self.load_btn)
         ops_layout.addWidget(self.reset_btn)
-        ops_layout.addWidget(self.boot_btn)
         scroll_layout.addLayout(ops_layout)
 
         scroll_layout.addStretch(1)
@@ -342,7 +340,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.save_btn.clicked.connect(self._save)
         self.load_btn.clicked.connect(self._load)
         self.reset_btn.clicked.connect(self._reset)
-        self.boot_btn.clicked.connect(self._boot)
         self.ble_idle_light_ms_supported = False
         self.ble_idle_medium_ms_supported = False
         self.ble_idle_sleep_ms_supported = False
@@ -623,9 +620,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
     def _reset(self):
         self._simple_cmd("RESET")
         self._refresh_values()
-
-    def _boot(self):
-        self._simple_cmd("BOOT")
 
     def _simple_cmd(self, cmd):
         if not self.client or not self.client.is_connected():
