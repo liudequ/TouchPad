@@ -224,6 +224,11 @@ uint16_t threeSwipeThresholdX = 200;
 uint16_t threeSwipeThresholdY = 200;
 uint16_t threeSwipeTimeout = 350;
 uint16_t threeSwipeCooldown = 400;
+// 四指滑动
+uint16_t fourSwipeThresholdX = 200;
+uint16_t fourSwipeThresholdY = 200;
+uint16_t fourSwipeTimeout = 350;
+uint16_t fourSwipeCooldown = 400;
 
 const char* CONFIG_PATH = "/config.txt";
 
@@ -231,13 +236,15 @@ const char* CONFIG_PATH = "/config.txt";
 enum GestureMode { MODE_NONE,
                    MODE_SINGLE,
                    MODE_DOUBLE,
-                   MODE_TRIPLE };
+                   MODE_TRIPLE,
+                   MODE_QUAD };
 GestureMode mode = MODE_NONE;
 
 int16_t lastX1 = 0, lastY1 = 0;
 int16_t lastX2 = 0, lastY2 = 0;
 unsigned long lastTouchTime = 0;
 unsigned long lastSwipeTime = 0;
+unsigned long lastFourSwipeTime = 0;
 unsigned long lastScrollTime = 0;
 unsigned long lastActivityMs = 0;
 
@@ -246,6 +253,20 @@ int16_t tripleStartY = 0;
 int16_t tripleLastX = 0;
 int16_t tripleLastY = 0;
 unsigned long tripleStartTime = 0;
+bool pendingThreeTap = false;
+unsigned long lastThreeTapTime = 0;
+int16_t lastThreeTapX = 0;
+int16_t lastThreeTapY = 0;
+
+int16_t quadStartX = 0;
+int16_t quadStartY = 0;
+int16_t quadLastX = 0;
+int16_t quadLastY = 0;
+unsigned long quadStartTime = 0;
+bool pendingFourTap = false;
+unsigned long lastFourTapTime = 0;
+int16_t lastFourTapX = 0;
+int16_t lastFourTapY = 0;
 
 float smoothDx = 0, smoothDy = 0;
 float accumX = 0, accumY = 0;
@@ -284,6 +305,14 @@ ZoneBinding threeLeftBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeRightBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeUpBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeDownBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding threeTapBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding threeDoubleTapBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourLeftBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourRightBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourUpBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourDownBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourTapBinding = { ZONE_NONE, 0, 0, 0 };
+ZoneBinding fourDoubleTapBinding = { ZONE_NONE, 0, 0, 0 };
 
 void normalizeIdleThresholds() {
   if (bleIdleLightMs < 1000) bleIdleLightMs = 1000;
@@ -387,10 +416,25 @@ void applyDefaults() {
   threeSwipeThresholdY = 200;
   threeSwipeTimeout = 350;
   threeSwipeCooldown = 400;
+  fourSwipeThresholdX = 200;
+  fourSwipeThresholdY = 200;
+  fourSwipeTimeout = 350;
+  fourSwipeCooldown = 400;
   threeLeftBinding = { ZONE_NONE, 0, 0, 0 };
   threeRightBinding = { ZONE_NONE, 0, 0, 0 };
   threeUpBinding = { ZONE_NONE, 0, 0, 0 };
   threeDownBinding = { ZONE_NONE, 0, 0, 0 };
+  threeTapBinding = { ZONE_NONE, 0, 0, 0 };
+  threeDoubleTapBinding = { ZONE_NONE, 0, 0, 0 };
+  fourLeftBinding = { ZONE_NONE, 0, 0, 0 };
+  fourRightBinding = { ZONE_NONE, 0, 0, 0 };
+  fourUpBinding = { ZONE_NONE, 0, 0, 0 };
+  fourDownBinding = { ZONE_NONE, 0, 0, 0 };
+  fourTapBinding = { ZONE_NONE, 0, 0, 0 };
+  fourDoubleTapBinding = { ZONE_NONE, 0, 0, 0 };
+  pendingClick = false;
+  pendingThreeTap = false;
+  pendingFourTap = false;
   normalizeIdleThresholds();
 }
 
@@ -635,6 +679,9 @@ void loop() {
   if (mode == MODE_TRIPLE && now - lastTouchTime > RELEASE_TIMEOUT) {
     mode = MODE_NONE;
   }
+  if (mode == MODE_QUAD && now - lastTouchTime > RELEASE_TIMEOUT) {
+    mode = MODE_NONE;
+  }
 
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
@@ -826,6 +873,22 @@ void processCommand(const String& line) {
     cfgOut->println(threeDownBinding.keyModifier);
     cfgOut->print("threeDownKey=");
     cfgOut->println(threeDownBinding.keyCode);
+    cfgOut->print("threeTapType=");
+    cfgOut->println(typeToString(threeTapBinding.type));
+    cfgOut->print("threeTapButtons=");
+    cfgOut->println(threeTapBinding.mouseButtons);
+    cfgOut->print("threeTapModifier=");
+    cfgOut->println(threeTapBinding.keyModifier);
+    cfgOut->print("threeTapKey=");
+    cfgOut->println(threeTapBinding.keyCode);
+    cfgOut->print("threeDoubleTapType=");
+    cfgOut->println(typeToString(threeDoubleTapBinding.type));
+    cfgOut->print("threeDoubleTapButtons=");
+    cfgOut->println(threeDoubleTapBinding.mouseButtons);
+    cfgOut->print("threeDoubleTapModifier=");
+    cfgOut->println(threeDoubleTapBinding.keyModifier);
+    cfgOut->print("threeDoubleTapKey=");
+    cfgOut->println(threeDoubleTapBinding.keyCode);
     cfgOut->print("threeSwipeThresholdX=");
     cfgOut->println(threeSwipeThresholdX);
     cfgOut->print("threeSwipeThresholdY=");
@@ -834,6 +897,62 @@ void processCommand(const String& line) {
     cfgOut->println(threeSwipeTimeout);
     cfgOut->print("threeSwipeCooldown=");
     cfgOut->println(threeSwipeCooldown);
+    cfgOut->print("fourLeftType=");
+    cfgOut->println(typeToString(fourLeftBinding.type));
+    cfgOut->print("fourLeftButtons=");
+    cfgOut->println(fourLeftBinding.mouseButtons);
+    cfgOut->print("fourLeftModifier=");
+    cfgOut->println(fourLeftBinding.keyModifier);
+    cfgOut->print("fourLeftKey=");
+    cfgOut->println(fourLeftBinding.keyCode);
+    cfgOut->print("fourRightType=");
+    cfgOut->println(typeToString(fourRightBinding.type));
+    cfgOut->print("fourRightButtons=");
+    cfgOut->println(fourRightBinding.mouseButtons);
+    cfgOut->print("fourRightModifier=");
+    cfgOut->println(fourRightBinding.keyModifier);
+    cfgOut->print("fourRightKey=");
+    cfgOut->println(fourRightBinding.keyCode);
+    cfgOut->print("fourUpType=");
+    cfgOut->println(typeToString(fourUpBinding.type));
+    cfgOut->print("fourUpButtons=");
+    cfgOut->println(fourUpBinding.mouseButtons);
+    cfgOut->print("fourUpModifier=");
+    cfgOut->println(fourUpBinding.keyModifier);
+    cfgOut->print("fourUpKey=");
+    cfgOut->println(fourUpBinding.keyCode);
+    cfgOut->print("fourDownType=");
+    cfgOut->println(typeToString(fourDownBinding.type));
+    cfgOut->print("fourDownButtons=");
+    cfgOut->println(fourDownBinding.mouseButtons);
+    cfgOut->print("fourDownModifier=");
+    cfgOut->println(fourDownBinding.keyModifier);
+    cfgOut->print("fourDownKey=");
+    cfgOut->println(fourDownBinding.keyCode);
+    cfgOut->print("fourTapType=");
+    cfgOut->println(typeToString(fourTapBinding.type));
+    cfgOut->print("fourTapButtons=");
+    cfgOut->println(fourTapBinding.mouseButtons);
+    cfgOut->print("fourTapModifier=");
+    cfgOut->println(fourTapBinding.keyModifier);
+    cfgOut->print("fourTapKey=");
+    cfgOut->println(fourTapBinding.keyCode);
+    cfgOut->print("fourDoubleTapType=");
+    cfgOut->println(typeToString(fourDoubleTapBinding.type));
+    cfgOut->print("fourDoubleTapButtons=");
+    cfgOut->println(fourDoubleTapBinding.mouseButtons);
+    cfgOut->print("fourDoubleTapModifier=");
+    cfgOut->println(fourDoubleTapBinding.keyModifier);
+    cfgOut->print("fourDoubleTapKey=");
+    cfgOut->println(fourDoubleTapBinding.keyCode);
+    cfgOut->print("fourSwipeThresholdX=");
+    cfgOut->println(fourSwipeThresholdX);
+    cfgOut->print("fourSwipeThresholdY=");
+    cfgOut->println(fourSwipeThresholdY);
+    cfgOut->print("fourSwipeTimeout=");
+    cfgOut->println(fourSwipeTimeout);
+    cfgOut->print("fourSwipeCooldown=");
+    cfgOut->println(fourSwipeCooldown);
     return;
   }
 
@@ -1085,6 +1204,46 @@ void processCommand(const String& line) {
       cfgOut->println(threeDownBinding.keyCode);
       return;
     }
+    if (key.equalsIgnoreCase("threeTapType")) {
+      cfgOut->print("threeTapType=");
+      cfgOut->println(typeToString(threeTapBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapButtons")) {
+      cfgOut->print("threeTapButtons=");
+      cfgOut->println(threeTapBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapModifier")) {
+      cfgOut->print("threeTapModifier=");
+      cfgOut->println(threeTapBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapKey")) {
+      cfgOut->print("threeTapKey=");
+      cfgOut->println(threeTapBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapType")) {
+      cfgOut->print("threeDoubleTapType=");
+      cfgOut->println(typeToString(threeDoubleTapBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapButtons")) {
+      cfgOut->print("threeDoubleTapButtons=");
+      cfgOut->println(threeDoubleTapBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapModifier")) {
+      cfgOut->print("threeDoubleTapModifier=");
+      cfgOut->println(threeDoubleTapBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapKey")) {
+      cfgOut->print("threeDoubleTapKey=");
+      cfgOut->println(threeDoubleTapBinding.keyCode);
+      return;
+    }
     if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
       cfgOut->print("threeSwipeThresholdX=");
       cfgOut->println(threeSwipeThresholdX);
@@ -1103,6 +1262,146 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("threeSwipeCooldown")) {
       cfgOut->print("threeSwipeCooldown=");
       cfgOut->println(threeSwipeCooldown);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftType")) {
+      cfgOut->print("fourLeftType=");
+      cfgOut->println(typeToString(fourLeftBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftButtons")) {
+      cfgOut->print("fourLeftButtons=");
+      cfgOut->println(fourLeftBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftModifier")) {
+      cfgOut->print("fourLeftModifier=");
+      cfgOut->println(fourLeftBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftKey")) {
+      cfgOut->print("fourLeftKey=");
+      cfgOut->println(fourLeftBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightType")) {
+      cfgOut->print("fourRightType=");
+      cfgOut->println(typeToString(fourRightBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightButtons")) {
+      cfgOut->print("fourRightButtons=");
+      cfgOut->println(fourRightBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightModifier")) {
+      cfgOut->print("fourRightModifier=");
+      cfgOut->println(fourRightBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightKey")) {
+      cfgOut->print("fourRightKey=");
+      cfgOut->println(fourRightBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpType")) {
+      cfgOut->print("fourUpType=");
+      cfgOut->println(typeToString(fourUpBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpButtons")) {
+      cfgOut->print("fourUpButtons=");
+      cfgOut->println(fourUpBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpModifier")) {
+      cfgOut->print("fourUpModifier=");
+      cfgOut->println(fourUpBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpKey")) {
+      cfgOut->print("fourUpKey=");
+      cfgOut->println(fourUpBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownType")) {
+      cfgOut->print("fourDownType=");
+      cfgOut->println(typeToString(fourDownBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownButtons")) {
+      cfgOut->print("fourDownButtons=");
+      cfgOut->println(fourDownBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownModifier")) {
+      cfgOut->print("fourDownModifier=");
+      cfgOut->println(fourDownBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownKey")) {
+      cfgOut->print("fourDownKey=");
+      cfgOut->println(fourDownBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapType")) {
+      cfgOut->print("fourTapType=");
+      cfgOut->println(typeToString(fourTapBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapButtons")) {
+      cfgOut->print("fourTapButtons=");
+      cfgOut->println(fourTapBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapModifier")) {
+      cfgOut->print("fourTapModifier=");
+      cfgOut->println(fourTapBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapKey")) {
+      cfgOut->print("fourTapKey=");
+      cfgOut->println(fourTapBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapType")) {
+      cfgOut->print("fourDoubleTapType=");
+      cfgOut->println(typeToString(fourDoubleTapBinding.type));
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapButtons")) {
+      cfgOut->print("fourDoubleTapButtons=");
+      cfgOut->println(fourDoubleTapBinding.mouseButtons);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapModifier")) {
+      cfgOut->print("fourDoubleTapModifier=");
+      cfgOut->println(fourDoubleTapBinding.keyModifier);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapKey")) {
+      cfgOut->print("fourDoubleTapKey=");
+      cfgOut->println(fourDoubleTapBinding.keyCode);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeThresholdX")) {
+      cfgOut->print("fourSwipeThresholdX=");
+      cfgOut->println(fourSwipeThresholdX);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeThresholdY")) {
+      cfgOut->print("fourSwipeThresholdY=");
+      cfgOut->println(fourSwipeThresholdY);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeTimeout")) {
+      cfgOut->print("fourSwipeTimeout=");
+      cfgOut->println(fourSwipeTimeout);
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeCooldown")) {
+      cfgOut->print("fourSwipeCooldown=");
+      cfgOut->println(fourSwipeCooldown);
       return;
     }
     cfgOut->print("ERR: key ");
@@ -1622,6 +1921,86 @@ void processCommand(const String& line) {
       }
       return;
     }
+    if (key.equalsIgnoreCase("threeTapType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeTapBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeTapBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeTapBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeTapKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeTapBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        threeDoubleTapBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        threeDoubleTapBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeDoubleTapBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("threeDoubleTapKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        threeDoubleTapBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
     if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
       int v = valueStr.toInt();
       if (v >= 50 && v <= 800) {
@@ -1656,6 +2035,286 @@ void processCommand(const String& line) {
       int v = valueStr.toInt();
       if (v >= 0 && v <= 2000) {
         threeSwipeCooldown = (uint16_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourLeftBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourLeftBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourLeftBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourLeftKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourLeftBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourRightBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourRightBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourRightBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourRightKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourRightBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourUpBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourUpBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourUpBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourUpKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourUpBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourDownBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourDownBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourDownBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDownKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourDownBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourTapBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourTapBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourTapBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourTapKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourTapBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapType")) {
+      ZoneType type;
+      if (parseType(valueStr, &type)) {
+        fourDoubleTapBinding.type = type;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapButtons")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 7) {
+        fourDoubleTapBinding.mouseButtons = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapModifier")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourDoubleTapBinding.keyModifier = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourDoubleTapKey")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 255) {
+        fourDoubleTapBinding.keyCode = (uint8_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeThresholdX")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 800) {
+        fourSwipeThresholdX = (uint16_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeThresholdY")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 800) {
+        fourSwipeThresholdY = (uint16_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeTimeout")) {
+      int v = valueStr.toInt();
+      if (v >= 50 && v <= 1000) {
+        fourSwipeTimeout = (uint16_t)v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("fourSwipeCooldown")) {
+      int v = valueStr.toInt();
+      if (v >= 0 && v <= 2000) {
+        fourSwipeCooldown = (uint16_t)v;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1869,6 +2528,30 @@ bool loadConfig() {
     } else if (key.equalsIgnoreCase("threeDownKey")) {
       int v = value.toInt();
       if (v >= 0 && v <= 255) threeDownBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeTapType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeTapBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeTapButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeTapBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeTapModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeTapBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeTapKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeTapBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDoubleTapType")) {
+      ZoneType type;
+      if (parseType(value, &type)) threeDoubleTapBinding.type = type;
+    } else if (key.equalsIgnoreCase("threeDoubleTapButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) threeDoubleTapBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDoubleTapModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeDoubleTapBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("threeDoubleTapKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) threeDoubleTapBinding.keyCode = (uint8_t)v;
     } else if (key.equalsIgnoreCase("threeSwipeThresholdX")) {
       int v = value.toInt();
       if (v >= 50 && v <= 800) threeSwipeThresholdX = (uint16_t)v;
@@ -1881,6 +2564,90 @@ bool loadConfig() {
     } else if (key.equalsIgnoreCase("threeSwipeCooldown")) {
       int v = value.toInt();
       if (v >= 0 && v <= 2000) threeSwipeCooldown = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("fourLeftType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourLeftBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourLeftButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourLeftBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourLeftModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourLeftBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourLeftKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourLeftBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourRightType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourRightBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourRightButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourRightBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourRightModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourRightBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourRightKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourRightBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourUpType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourUpBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourUpButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourUpBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourUpModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourUpBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourUpKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourUpBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDownType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourDownBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourDownButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourDownBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDownModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourDownBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDownKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourDownBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourTapType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourTapBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourTapButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourTapBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourTapModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourTapBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourTapKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourTapBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDoubleTapType")) {
+      ZoneType type;
+      if (parseType(value, &type)) fourDoubleTapBinding.type = type;
+    } else if (key.equalsIgnoreCase("fourDoubleTapButtons")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 7) fourDoubleTapBinding.mouseButtons = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDoubleTapModifier")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourDoubleTapBinding.keyModifier = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourDoubleTapKey")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 255) fourDoubleTapBinding.keyCode = (uint8_t)v;
+    } else if (key.equalsIgnoreCase("fourSwipeThresholdX")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 800) fourSwipeThresholdX = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("fourSwipeThresholdY")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 800) fourSwipeThresholdY = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("fourSwipeTimeout")) {
+      int v = value.toInt();
+      if (v >= 50 && v <= 1000) fourSwipeTimeout = (uint16_t)v;
+    } else if (key.equalsIgnoreCase("fourSwipeCooldown")) {
+      int v = value.toInt();
+      if (v >= 0 && v <= 2000) fourSwipeCooldown = (uint16_t)v;
     } else if (key.equalsIgnoreCase("rate")) {
       int v = value.toInt();
       if (v >= 10 && v <= 200) {
@@ -1999,6 +2766,22 @@ bool saveConfig() {
   f.println(threeDownBinding.keyModifier);
   f.print("threeDownKey=");
   f.println(threeDownBinding.keyCode);
+  f.print("threeTapType=");
+  f.println(typeToString(threeTapBinding.type));
+  f.print("threeTapButtons=");
+  f.println(threeTapBinding.mouseButtons);
+  f.print("threeTapModifier=");
+  f.println(threeTapBinding.keyModifier);
+  f.print("threeTapKey=");
+  f.println(threeTapBinding.keyCode);
+  f.print("threeDoubleTapType=");
+  f.println(typeToString(threeDoubleTapBinding.type));
+  f.print("threeDoubleTapButtons=");
+  f.println(threeDoubleTapBinding.mouseButtons);
+  f.print("threeDoubleTapModifier=");
+  f.println(threeDoubleTapBinding.keyModifier);
+  f.print("threeDoubleTapKey=");
+  f.println(threeDoubleTapBinding.keyCode);
   f.print("threeSwipeThresholdX=");
   f.println(threeSwipeThresholdX);
   f.print("threeSwipeThresholdY=");
@@ -2007,6 +2790,62 @@ bool saveConfig() {
   f.println(threeSwipeTimeout);
   f.print("threeSwipeCooldown=");
   f.println(threeSwipeCooldown);
+  f.print("fourLeftType=");
+  f.println(typeToString(fourLeftBinding.type));
+  f.print("fourLeftButtons=");
+  f.println(fourLeftBinding.mouseButtons);
+  f.print("fourLeftModifier=");
+  f.println(fourLeftBinding.keyModifier);
+  f.print("fourLeftKey=");
+  f.println(fourLeftBinding.keyCode);
+  f.print("fourRightType=");
+  f.println(typeToString(fourRightBinding.type));
+  f.print("fourRightButtons=");
+  f.println(fourRightBinding.mouseButtons);
+  f.print("fourRightModifier=");
+  f.println(fourRightBinding.keyModifier);
+  f.print("fourRightKey=");
+  f.println(fourRightBinding.keyCode);
+  f.print("fourUpType=");
+  f.println(typeToString(fourUpBinding.type));
+  f.print("fourUpButtons=");
+  f.println(fourUpBinding.mouseButtons);
+  f.print("fourUpModifier=");
+  f.println(fourUpBinding.keyModifier);
+  f.print("fourUpKey=");
+  f.println(fourUpBinding.keyCode);
+  f.print("fourDownType=");
+  f.println(typeToString(fourDownBinding.type));
+  f.print("fourDownButtons=");
+  f.println(fourDownBinding.mouseButtons);
+  f.print("fourDownModifier=");
+  f.println(fourDownBinding.keyModifier);
+  f.print("fourDownKey=");
+  f.println(fourDownBinding.keyCode);
+  f.print("fourTapType=");
+  f.println(typeToString(fourTapBinding.type));
+  f.print("fourTapButtons=");
+  f.println(fourTapBinding.mouseButtons);
+  f.print("fourTapModifier=");
+  f.println(fourTapBinding.keyModifier);
+  f.print("fourTapKey=");
+  f.println(fourTapBinding.keyCode);
+  f.print("fourDoubleTapType=");
+  f.println(typeToString(fourDoubleTapBinding.type));
+  f.print("fourDoubleTapButtons=");
+  f.println(fourDoubleTapBinding.mouseButtons);
+  f.print("fourDoubleTapModifier=");
+  f.println(fourDoubleTapBinding.keyModifier);
+  f.print("fourDoubleTapKey=");
+  f.println(fourDoubleTapBinding.keyCode);
+  f.print("fourSwipeThresholdX=");
+  f.println(fourSwipeThresholdX);
+  f.print("fourSwipeThresholdY=");
+  f.println(fourSwipeThresholdY);
+  f.print("fourSwipeTimeout=");
+  f.println(fourSwipeTimeout);
+  f.print("fourSwipeCooldown=");
+  f.println(fourSwipeCooldown);
   f.print("rate=");
   f.println(reportIntervalMs ? (1000 / reportIntervalMs) : 0);
   f.close();
@@ -2058,6 +2897,30 @@ void performZoneAction(const ZoneBinding& binding) {
     }
     return;
   }
+}
+
+void performTapBinding(bool* pendingTap,
+                       unsigned long* lastTapTimeMs,
+                       int16_t* lastTapPosX,
+                       int16_t* lastTapPosY,
+                       int16_t tapX,
+                       int16_t tapY,
+                       unsigned long now,
+                       const ZoneBinding& singleTapBinding,
+                       const ZoneBinding& doubleTapBinding) {
+  if (*pendingTap && now - *lastTapTimeMs <= DOUBLE_TAP_WINDOW) {
+    uint16_t dist = abs(tapX - *lastTapPosX) + abs(tapY - *lastTapPosY);
+    if (dist <= DOUBLE_TAP_MAX_MOVE) {
+      performZoneAction(doubleTapBinding);
+      *pendingTap = false;
+      return;
+    }
+  }
+  performZoneAction(singleTapBinding);
+  *pendingTap = true;
+  *lastTapTimeMs = now;
+  *lastTapPosX = tapX;
+  *lastTapPosY = tapY;
 }
 
 void sendMouseMove(int8_t x, int8_t y) {
@@ -2119,10 +2982,12 @@ void handleReport(uint8_t* buf, uint16_t len) {
   uint8_t s0 = buf[3];
   uint8_t s1 = buf[8];
   uint8_t s2 = (len >= 18) ? buf[13] : 0;
+  uint8_t s3 = (len >= 23) ? buf[18] : 0;
 
   bool f1 = s0 & 0x02;
   bool f2 = s1 & 0x02;
   bool f3 = (len >= 18) ? (s2 & 0x02) : false;
+  bool f4 = (len >= 23) ? (s3 & 0x02) : false;
 
   int16_t x1 = buf[4] | (buf[5] << 8);
   int16_t y1 = buf[6] | (buf[7] << 8);
@@ -2130,10 +2995,70 @@ void handleReport(uint8_t* buf, uint16_t len) {
   int16_t y2 = buf[11] | (buf[12] << 8);
   int16_t x3 = (len >= 18) ? (buf[14] | (buf[15] << 8)) : 0;
   int16_t y3 = (len >= 18) ? (buf[16] | (buf[17] << 8)) : 0;
+  int16_t x4 = (len >= 23) ? (buf[19] | (buf[20] << 8)) : 0;
+  int16_t y4 = (len >= 23) ? (buf[21] | (buf[22] << 8)) : 0;
 
   unsigned long now = millis();
 
-  /*===== 三指左右滑动 =====*/
+  /*===== 四指手势 =====*/
+  if (f1 && f2 && f3 && f4) {
+    int16_t avgX = (x1 + x2 + x3 + x4) / 4;
+    int16_t avgY = (y1 + y2 + y3 + y4) / 4;
+    if (mode != MODE_QUAD) {
+      quadStartX = avgX;
+      quadStartY = avgY;
+      quadLastX = avgX;
+      quadLastY = avgY;
+      quadStartTime = now;
+    } else {
+      quadLastX = avgX;
+      quadLastY = avgY;
+    }
+    mode = MODE_QUAD;
+    tapCandidate = false;
+    lastTouchTime = now;
+    return;
+  }
+
+  if (mode == MODE_QUAD && !(f1 && f2 && f3 && f4)) {
+    int16_t dx = quadLastX - quadStartX;
+    int16_t dy = quadLastY - quadStartY;
+    uint16_t dist = abs(dx) + abs(dy);
+    unsigned long dt = now - quadStartTime;
+    bool triggered = false;
+    if (dt <= fourSwipeTimeout && now - lastFourSwipeTime >= fourSwipeCooldown) {
+      if (abs(dx) >= (int16_t)fourSwipeThresholdX && abs(dx) >= abs(dy)) {
+        if (dx > 0) {
+          performZoneAction(fourRightBinding);
+        } else {
+          performZoneAction(fourLeftBinding);
+        }
+        lastFourSwipeTime = now;
+        triggered = true;
+      } else if (abs(dy) >= (int16_t)fourSwipeThresholdY && abs(dy) > abs(dx)) {
+        if (dy > 0) {
+          performZoneAction(fourDownBinding);
+        } else {
+          performZoneAction(fourUpBinding);
+        }
+        lastFourSwipeTime = now;
+        triggered = true;
+      }
+    }
+    if (!triggered && dt <= TAP_MAX_MS && dist <= DOUBLE_TAP_MAX_MOVE) {
+      performTapBinding(&pendingFourTap, &lastFourTapTime, &lastFourTapX, &lastFourTapY,
+                        quadStartX, quadStartY, now, fourTapBinding, fourDoubleTapBinding);
+      triggered = true;
+    }
+    if (triggered) {
+      pendingClick = false;
+      tapCandidate = false;
+    }
+    mode = MODE_NONE;
+    return;
+  }
+
+  /*===== 三指手势 =====*/
   if (f1 && f2 && f3) {
     int16_t avgX = (x1 + x2 + x3) / 3;
     int16_t avgY = (y1 + y2 + y3) / 3;
@@ -2156,7 +3081,9 @@ void handleReport(uint8_t* buf, uint16_t len) {
   if (mode == MODE_TRIPLE && !(f1 && f2 && f3)) {
     int16_t dx = tripleLastX - tripleStartX;
     int16_t dy = tripleLastY - tripleStartY;
+    uint16_t dist = abs(dx) + abs(dy);
     unsigned long dt = now - tripleStartTime;
+    bool triggered = false;
     if (dt <= threeSwipeTimeout && now - lastSwipeTime >= threeSwipeCooldown) {
       if (abs(dx) >= (int16_t)threeSwipeThresholdX && abs(dx) >= abs(dy)) {
         if (dx > 0) {
@@ -2165,6 +3092,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
           performZoneAction(threeLeftBinding);
         }
         lastSwipeTime = now;
+        triggered = true;
       } else if (abs(dy) >= (int16_t)threeSwipeThresholdY && abs(dy) > abs(dx)) {
         if (dy > 0) {
           performZoneAction(threeDownBinding);
@@ -2172,7 +3100,17 @@ void handleReport(uint8_t* buf, uint16_t len) {
           performZoneAction(threeUpBinding);
         }
         lastSwipeTime = now;
+        triggered = true;
       }
+    }
+    if (!triggered && dt <= TAP_MAX_MS && dist <= DOUBLE_TAP_MAX_MOVE) {
+      performTapBinding(&pendingThreeTap, &lastThreeTapTime, &lastThreeTapX, &lastThreeTapY,
+                        tripleStartX, tripleStartY, now, threeTapBinding, threeDoubleTapBinding);
+      triggered = true;
+    }
+    if (triggered) {
+      pendingClick = false;
+      tapCandidate = false;
     }
     mode = MODE_NONE;
     return;

@@ -30,6 +30,9 @@
 - 右下角轻触：右键（默认）。
 - 左下角轻触：默认未绑定，可在配置中自定义。
 - 三指左右/上下滑动：触发配置绑定动作。
+- 三指单击/双击：触发配置绑定动作。
+- 四指左右/上下滑动：触发配置绑定动作。
+- 四指单击/双击：触发配置绑定动作。
 
 ## 区域说明
 当前区域划分为上边 `20%` 高度、左右各 `35%` 宽度。
@@ -60,7 +63,10 @@ PAIRCLR
 - 区域：`topZonePercent`、`sideZonePercent`、`enableNavZones`
 - 四角动作：`leftTop*`、`rightTop*`、`rightBottom*`、`leftBottom*`
 - 三指动作：`threeLeft*`、`threeRight*`、`threeUp*`、`threeDown*`
+- 三指点击：`threeTap*`、`threeDoubleTap*`
 - 三指阈值：`threeSwipeThresholdX`、`threeSwipeThresholdY`、`threeSwipeTimeout`、`threeSwipeCooldown`
+- 四指动作：`fourLeft*`、`fourRight*`、`fourUp*`、`fourDown*`、`fourTap*`、`fourDoubleTap*`
+- 四指阈值：`fourSwipeThresholdX`、`fourSwipeThresholdY`、`fourSwipeTimeout`、`fourSwipeCooldown`
 - 连接/省电：`useBleWhenUsb`、`bleIdleSleepEnabled`、`bleIdleLightMs`、`bleIdleMediumMs`、`bleIdleSleepMs`、`lightIdleRate`
 
 区域类型可选值：`NONE`、`MOUSE`、`KEYBOARD`。

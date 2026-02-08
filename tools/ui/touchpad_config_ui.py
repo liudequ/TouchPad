@@ -109,6 +109,14 @@ ZONE_NAME_MAP = {
     "threeRight": "三指右滑",
     "threeUp": "三指上滑",
     "threeDown": "三指下滑",
+    "threeTap": "三指单击",
+    "threeDoubleTap": "三指双击",
+    "fourLeft": "四指左滑",
+    "fourRight": "四指右滑",
+    "fourUp": "四指上滑",
+    "fourDown": "四指下滑",
+    "fourTap": "四指单击",
+    "fourDoubleTap": "四指双击",
 }
 
 
@@ -258,6 +266,10 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._add_zone_rows(swipe_layout, "threeRight", self.three_right)
         self._add_zone_rows(swipe_layout, "threeUp", self.three_up)
         self._add_zone_rows(swipe_layout, "threeDown", self.three_down)
+        self.three_tap = self._create_zone_widgets()
+        self.three_double_tap = self._create_zone_widgets()
+        self._add_zone_rows(swipe_layout, "threeTap", self.three_tap)
+        self._add_zone_rows(swipe_layout, "threeDoubleTap", self.three_double_tap)
         self.three_threshold = QtWidgets.QSpinBox()
         self.three_threshold.setRange(50, 800)
         self.three_threshold_y = QtWidgets.QSpinBox()
@@ -271,6 +283,34 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         swipe_layout.addRow("滑动超时(ms)", self.three_timeout)
         swipe_layout.addRow("冷却时间(ms)", self.three_cooldown)
         scroll_layout.addWidget(swipe_group)
+
+        four_group = QtWidgets.QGroupBox("四指手势")
+        four_layout = QtWidgets.QFormLayout(four_group)
+        self.four_left = self._create_zone_widgets()
+        self.four_right = self._create_zone_widgets()
+        self.four_up = self._create_zone_widgets()
+        self.four_down = self._create_zone_widgets()
+        self.four_tap = self._create_zone_widgets()
+        self.four_double_tap = self._create_zone_widgets()
+        self._add_zone_rows(four_layout, "fourLeft", self.four_left)
+        self._add_zone_rows(four_layout, "fourRight", self.four_right)
+        self._add_zone_rows(four_layout, "fourUp", self.four_up)
+        self._add_zone_rows(four_layout, "fourDown", self.four_down)
+        self._add_zone_rows(four_layout, "fourTap", self.four_tap)
+        self._add_zone_rows(four_layout, "fourDoubleTap", self.four_double_tap)
+        self.four_threshold = QtWidgets.QSpinBox()
+        self.four_threshold.setRange(50, 800)
+        self.four_threshold_y = QtWidgets.QSpinBox()
+        self.four_threshold_y.setRange(50, 800)
+        self.four_timeout = QtWidgets.QSpinBox()
+        self.four_timeout.setRange(50, 1000)
+        self.four_cooldown = QtWidgets.QSpinBox()
+        self.four_cooldown.setRange(0, 2000)
+        four_layout.addRow("水平阈值", self.four_threshold)
+        four_layout.addRow("垂直阈值", self.four_threshold_y)
+        four_layout.addRow("滑动超时(ms)", self.four_timeout)
+        four_layout.addRow("冷却时间(ms)", self.four_cooldown)
+        scroll_layout.addWidget(four_group)
 
         ops_layout = QtWidgets.QHBoxLayout()
         self.apply_btn = QtWidgets.QPushButton("应用")
@@ -445,6 +485,8 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self._apply_zone_values(self.three_right, data, "threeRight")
         self._apply_zone_values(self.three_up, data, "threeUp")
         self._apply_zone_values(self.three_down, data, "threeDown")
+        self._apply_zone_values(self.three_tap, data, "threeTap")
+        self._apply_zone_values(self.three_double_tap, data, "threeDoubleTap")
         if "threeSwipeThresholdX" in data:
             self.three_threshold.setValue(int(data["threeSwipeThresholdX"]))
         if "threeSwipeThresholdY" in data:
@@ -453,6 +495,20 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.three_timeout.setValue(int(data["threeSwipeTimeout"]))
         if "threeSwipeCooldown" in data:
             self.three_cooldown.setValue(int(data["threeSwipeCooldown"]))
+        self._apply_zone_values(self.four_left, data, "fourLeft")
+        self._apply_zone_values(self.four_right, data, "fourRight")
+        self._apply_zone_values(self.four_up, data, "fourUp")
+        self._apply_zone_values(self.four_down, data, "fourDown")
+        self._apply_zone_values(self.four_tap, data, "fourTap")
+        self._apply_zone_values(self.four_double_tap, data, "fourDoubleTap")
+        if "fourSwipeThresholdX" in data:
+            self.four_threshold.setValue(int(data["fourSwipeThresholdX"]))
+        if "fourSwipeThresholdY" in data:
+            self.four_threshold_y.setValue(int(data["fourSwipeThresholdY"]))
+        if "fourSwipeTimeout" in data:
+            self.four_timeout.setValue(int(data["fourSwipeTimeout"]))
+        if "fourSwipeCooldown" in data:
+            self.four_cooldown.setValue(int(data["fourSwipeCooldown"]))
         self._log("已读取当前值")
 
     def _set_combo(self, combo, value):
@@ -537,10 +593,22 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         cmds += self._zone_set_cmds("threeRight", self.three_right)
         cmds += self._zone_set_cmds("threeUp", self.three_up)
         cmds += self._zone_set_cmds("threeDown", self.three_down)
+        cmds += self._zone_set_cmds("threeTap", self.three_tap)
+        cmds += self._zone_set_cmds("threeDoubleTap", self.three_double_tap)
         cmds.append(f"SET threeSwipeThresholdX {self.three_threshold.value()}")
         cmds.append(f"SET threeSwipeThresholdY {self.three_threshold_y.value()}")
         cmds.append(f"SET threeSwipeTimeout {self.three_timeout.value()}")
         cmds.append(f"SET threeSwipeCooldown {self.three_cooldown.value()}")
+        cmds += self._zone_set_cmds("fourLeft", self.four_left)
+        cmds += self._zone_set_cmds("fourRight", self.four_right)
+        cmds += self._zone_set_cmds("fourUp", self.four_up)
+        cmds += self._zone_set_cmds("fourDown", self.four_down)
+        cmds += self._zone_set_cmds("fourTap", self.four_tap)
+        cmds += self._zone_set_cmds("fourDoubleTap", self.four_double_tap)
+        cmds.append(f"SET fourSwipeThresholdX {self.four_threshold.value()}")
+        cmds.append(f"SET fourSwipeThresholdY {self.four_threshold_y.value()}")
+        cmds.append(f"SET fourSwipeTimeout {self.four_timeout.value()}")
+        cmds.append(f"SET fourSwipeCooldown {self.four_cooldown.value()}")
         for cmd in cmds:
             for line in self.client.send(cmd):
                 self._log(line)

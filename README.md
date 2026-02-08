@@ -77,7 +77,7 @@
 ## 触摸板代码概览
 这是一个触摸板项目。关键草图及职责如下：
 
-- `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`：nRF 主触摸板实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、三指手势、点击/双击、USB/BLE HID 输出、省电分级、配置持久化）。
+- `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`：nRF 主触摸板实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、三指/四指手势、点击/双击、USB/BLE HID 输出、省电分级、配置持久化）。
 - `sketches/common/two_finger_tuning/two_finger_tuning.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
 - `sketches/common/hid_report_dump/hid_report_dump.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
 - `sketches/common/try_read_data/try_read_data.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
