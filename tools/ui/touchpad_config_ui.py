@@ -201,13 +201,27 @@ class TouchpadConfigUI(QtWidgets.QWidget):
 
         power_group = QtWidgets.QGroupBox("蓝牙/省电")
         power_layout = QtWidgets.QFormLayout(power_group)
+        self.ble_idle_light_ms = QtWidgets.QSpinBox()
+        self.ble_idle_light_ms.setRange(1000, 3600000)
+        self.ble_idle_light_ms.setSingleStep(1000)
+        self.ble_idle_light_ms.setSuffix(" ms")
+        self.ble_idle_light_ms.setValue(60000)
+        self.ble_idle_light_ms.setEnabled(False)
+        power_layout.addRow("第一阶段触发时长", self.ble_idle_light_ms)
+        self.ble_idle_medium_ms = QtWidgets.QSpinBox()
+        self.ble_idle_medium_ms.setRange(1000, 3600000)
+        self.ble_idle_medium_ms.setSingleStep(1000)
+        self.ble_idle_medium_ms.setSuffix(" ms")
+        self.ble_idle_medium_ms.setValue(180000)
+        self.ble_idle_medium_ms.setEnabled(False)
+        power_layout.addRow("第二阶段触发时长", self.ble_idle_medium_ms)
         self.ble_idle_sleep_ms = QtWidgets.QSpinBox()
         self.ble_idle_sleep_ms.setRange(1000, 3600000)
         self.ble_idle_sleep_ms.setSingleStep(1000)
         self.ble_idle_sleep_ms.setSuffix(" ms")
-        self.ble_idle_sleep_ms.setValue(60000)
+        self.ble_idle_sleep_ms.setValue(600000)
         self.ble_idle_sleep_ms.setEnabled(False)
-        power_layout.addRow("空闲休眠触发时长", self.ble_idle_sleep_ms)
+        power_layout.addRow("第三阶段触发时长", self.ble_idle_sleep_ms)
         scroll_layout.addWidget(power_group)
 
         zone_group = QtWidgets.QGroupBox("区域")
@@ -289,6 +303,8 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.load_btn.clicked.connect(self._load)
         self.reset_btn.clicked.connect(self._reset)
         self.boot_btn.clicked.connect(self._boot)
+        self.ble_idle_light_ms_supported = False
+        self.ble_idle_medium_ms_supported = False
         self.ble_idle_sleep_ms_supported = False
 
     def _record_shortcut(self, widgets):
@@ -394,6 +410,20 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.move_deadband.setValue(int(data["moveDeadband"]))
         if "rate" in data:
             self.report_rate.setValue(int(data["rate"]))
+        if "bleIdleLightMs" in data:
+            self.ble_idle_light_ms_supported = True
+            self.ble_idle_light_ms.setEnabled(True)
+            self.ble_idle_light_ms.setValue(int(data["bleIdleLightMs"]))
+        else:
+            self.ble_idle_light_ms_supported = False
+            self.ble_idle_light_ms.setEnabled(False)
+        if "bleIdleMediumMs" in data:
+            self.ble_idle_medium_ms_supported = True
+            self.ble_idle_medium_ms.setEnabled(True)
+            self.ble_idle_medium_ms.setValue(int(data["bleIdleMediumMs"]))
+        else:
+            self.ble_idle_medium_ms_supported = False
+            self.ble_idle_medium_ms.setEnabled(False)
         if "bleIdleSleepMs" in data:
             self.ble_idle_sleep_ms_supported = True
             self.ble_idle_sleep_ms.setEnabled(True)
@@ -493,6 +523,10 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",
             f"SET rate {self.report_rate.value()}",
         ]
+        if self.ble_idle_light_ms_supported:
+            cmds.append(f"SET bleIdleLightMs {self.ble_idle_light_ms.value()}")
+        if self.ble_idle_medium_ms_supported:
+            cmds.append(f"SET bleIdleMediumMs {self.ble_idle_medium_ms.value()}")
         if self.ble_idle_sleep_ms_supported:
             cmds.append(f"SET bleIdleSleepMs {self.ble_idle_sleep_ms.value()}")
         cmds += self._zone_set_cmds("leftTop", self.left_top)

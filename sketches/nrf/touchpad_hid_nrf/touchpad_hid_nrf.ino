@@ -63,6 +63,8 @@ static const uint8_t kBleWrCmdQueueSize = 4;
 
 void onConnect(uint16_t conn_handle);
 void onDisconnect(uint16_t conn_handle, uint8_t reason);
+void startAdv();
+void enterDeepSleep();
 
 #if defined(ARDUINO_ARCH_NRF52)
 extern const uint32_t g_ADigitalPinMap[];
@@ -72,7 +74,19 @@ static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
 static bool useBleWhenUsb = false;
 static bool bleIdleSleepEnabled = false;
-static unsigned long bleIdleSleepMs = IDLE_SLEEP_MS;
+static unsigned long bleIdleLightMs = IDLE_SLEEP_MS;
+static unsigned long bleIdleMediumMs = IDLE_SLEEP_MS * 3;
+static unsigned long bleIdleSleepMs = IDLE_SLEEP_MS * 10;
+static uint32_t lightIdleReportIntervalMs = 33;
+
+enum PowerStage {
+  POWER_ACTIVE = 0,
+  POWER_IDLE_LIGHT = 1,
+  POWER_IDLE_MEDIUM = 2,
+};
+
+static PowerStage powerStage = POWER_ACTIVE;
+static bool advSuppressedByIdle = false;
 
 bool isUsbMounted() {
   return TinyUSBDevice.mounted();
@@ -81,6 +95,14 @@ bool isUsbMounted() {
 bool useBleTransport() {
   return !isUsbMounted() || useBleWhenUsb;
 }
+
+void normalizeIdleThresholds();
+uint32_t effectiveReportIntervalMs();
+void leaveIdlePowerStage();
+void enterIdleLightStage();
+void enterIdleMediumStage();
+void handleIdlePower(unsigned long now);
+void markActivity();
 
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
@@ -179,6 +201,80 @@ ZoneBinding threeRightBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeUpBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding threeDownBinding = { ZONE_NONE, 0, 0, 0 };
 
+void normalizeIdleThresholds() {
+  if (bleIdleLightMs < 1000) bleIdleLightMs = 1000;
+  if (bleIdleMediumMs <= bleIdleLightMs) bleIdleMediumMs = bleIdleLightMs + 1000;
+  if (bleIdleSleepMs <= bleIdleMediumMs) bleIdleSleepMs = bleIdleMediumMs + 1000;
+  if (lightIdleReportIntervalMs < reportIntervalMs) lightIdleReportIntervalMs = reportIntervalMs;
+}
+
+uint32_t effectiveReportIntervalMs() {
+  if (powerStage == POWER_IDLE_LIGHT || powerStage == POWER_IDLE_MEDIUM) {
+    return max(reportIntervalMs, lightIdleReportIntervalMs);
+  }
+  return reportIntervalMs;
+}
+
+void leaveIdlePowerStage() {
+  if (powerStage == POWER_ACTIVE && !advSuppressedByIdle) return;
+  powerStage = POWER_ACTIVE;
+  advSuppressedByIdle = false;
+  unsigned long now = millis();
+  lastReportMs = now;
+  lastScrollReportMs = now;
+
+  if (useBleTransport() && !Bluefruit.connected()) {
+    startAdv();
+  }
+}
+
+void enterIdleLightStage() {
+  if (powerStage >= POWER_IDLE_LIGHT) return;
+  powerStage = POWER_IDLE_LIGHT;
+  if (!Bluefruit.connected()) {
+    Bluefruit.Advertising.stop();
+    advSuppressedByIdle = true;
+  }
+}
+
+void enterIdleMediumStage() {
+  if (powerStage >= POWER_IDLE_MEDIUM) return;
+  powerStage = POWER_IDLE_MEDIUM;
+  if (Bluefruit.connected()) {
+    Bluefruit.disconnect(0);
+    delay(50);
+  }
+  Bluefruit.Advertising.stop();
+  advSuppressedByIdle = true;
+}
+
+void handleIdlePower(unsigned long now) {
+  if (!bleIdleSleepEnabled || !useBleTransport()) {
+    leaveIdlePowerStage();
+    return;
+  }
+
+  unsigned long idleMs = now - lastActivityMs;
+  if (idleMs >= bleIdleSleepMs) {
+    enterDeepSleep();
+    return;
+  }
+  if (idleMs >= bleIdleMediumMs) {
+    enterIdleMediumStage();
+    return;
+  }
+  if (idleMs >= bleIdleLightMs) {
+    enterIdleLightStage();
+    return;
+  }
+  leaveIdlePowerStage();
+}
+
+void markActivity() {
+  lastActivityMs = millis();
+  leaveIdlePowerStage();
+}
+
 void applyDefaults() {
   sensitivity = 0.3f;
   smoothFactor = 0.5f;
@@ -192,7 +288,10 @@ void applyDefaults() {
   enableNavZones = true;
   useBleWhenUsb = false;
   bleIdleSleepEnabled = false;
-  bleIdleSleepMs = IDLE_SLEEP_MS;
+  bleIdleLightMs = IDLE_SLEEP_MS;
+  bleIdleMediumMs = IDLE_SLEEP_MS * 3;
+  bleIdleSleepMs = IDLE_SLEEP_MS * 10;
+  lightIdleReportIntervalMs = 33;
   leftTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_LEFT };
   rightTopZone = { ZONE_KEYBOARD, 0, KEYBOARD_MODIFIER_LEFTALT, HID_KEY_ARROW_RIGHT };
   rightBottomZone = { ZONE_MOUSE, MOUSE_BUTTON_RIGHT, 0, 0 };
@@ -205,6 +304,7 @@ void applyDefaults() {
   threeRightBinding = { ZONE_NONE, 0, 0, 0 };
   threeUpBinding = { ZONE_NONE, 0, 0, 0 };
   threeDownBinding = { ZONE_NONE, 0, 0, 0 };
+  normalizeIdleThresholds();
 }
 
 /*===========================
@@ -262,6 +362,10 @@ void updateTransport() {
   bool usbMounted = isUsbMounted();
   if (usbMounted == lastUsbMounted) return;
   lastUsbMounted = usbMounted;
+  if (usbMounted) {
+    advSuppressedByIdle = false;
+    powerStage = POWER_ACTIVE;
+  }
 
   if (usbMounted) {
     if (!useBleWhenUsb && Bluefruit.connected()) {
@@ -270,10 +374,10 @@ void updateTransport() {
     }
     if (!useBleWhenUsb) {
       Bluefruit.Advertising.stop();
-    } else {
+    } else if (!advSuppressedByIdle) {
       startAdv();
     }
-  } else {
+  } else if (!advSuppressedByIdle) {
     startAdv();
   }
 }
@@ -318,6 +422,7 @@ void enterDeepSleep() {
 }
 
 void onConnect(uint16_t conn_handle) {
+  markActivity();
   BLEConnection* connection = Bluefruit.Connection(conn_handle);
   if (connection) {
     connection->requestConnectionParameter(12, 0, 400);
@@ -327,6 +432,9 @@ void onConnect(uint16_t conn_handle) {
 void onDisconnect(uint16_t conn_handle, uint8_t reason) {
   (void)conn_handle;
   (void)reason;
+  if (advSuppressedByIdle) {
+    Bluefruit.Advertising.stop();
+  }
 }
 
 void setup() {
@@ -360,7 +468,7 @@ void setup() {
   initUsbHid();
   initBle();
   updateTransport();
-  lastActivityMs = millis();
+  markActivity();
 }
 
 const char* typeToString(ZoneType type) {
@@ -400,11 +508,9 @@ void loop() {
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
-  if (bleIdleSleepEnabled && useBleTransport() && millis() - lastActivityMs > bleIdleSleepMs) {
-    enterDeepSleep();
-  }
-
   unsigned long now = millis();
+  handleIdlePower(now);
+  now = millis();
 
   /*单指超时释放*/
   if (mode == MODE_SINGLE && now - lastTouchTime > RELEASE_TIMEOUT) {
@@ -430,10 +536,11 @@ void loop() {
 
   /*连续输出*/
   if (mode == MODE_SINGLE && !tapCandidate) {
-    if (now - lastReportMs >= reportIntervalMs) {
+    uint32_t intervalMs = effectiveReportIntervalMs();
+    if (now - lastReportMs >= intervalMs) {
       unsigned long dtMs = now - lastReportMs;
       lastReportMs = now;
-      float dt = dtMs / (float)reportIntervalMs;
+      float dt = dtMs / (float)intervalMs;
       if (dt > 1.5f) dt = 1.0f;
       accumX += velX * dt;
       accumY += velY * dt;
@@ -453,7 +560,7 @@ void loop() {
 
   if (mode == MODE_DOUBLE) {
     accumScroll += scrollVel;
-    if (now - lastScrollReportMs >= reportIntervalMs) {
+    if (now - lastScrollReportMs >= effectiveReportIntervalMs()) {
       lastScrollReportMs = now;
       int16_t s16 = (int16_t)accumScroll;
       s16 = constrain(s16, -127, 127);
@@ -488,6 +595,8 @@ void handleSerial() {
 }
 
 void processCommand(const String& line) {
+  markActivity();
+
   if (line.equalsIgnoreCase("HELP")) {
     cfgOut->println("CMD: GET scrollSensitivity");
     cfgOut->println("CMD: GET");
@@ -499,7 +608,10 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: PAIRCLR");
     cfgOut->println("CMD: GET useBleWhenUsb");
     cfgOut->println("CMD: GET bleIdleSleepEnabled");
+    cfgOut->println("CMD: GET bleIdleLightMs");
+    cfgOut->println("CMD: GET bleIdleMediumMs");
     cfgOut->println("CMD: GET bleIdleSleepMs");
+    cfgOut->println("CMD: GET lightIdleRate");
     return;
   }
 
@@ -508,6 +620,7 @@ void processCommand(const String& line) {
     if (v >= 10 && v <= 200) {
       reportIntervalMs = (uint32_t)(1000 / v);
       if (reportIntervalMs == 0) reportIntervalMs = 1;
+      normalizeIdleThresholds();
     }
     return;
   }
@@ -539,8 +652,14 @@ void processCommand(const String& line) {
     cfgOut->println(useBleWhenUsb ? "1" : "0");
     cfgOut->print("bleIdleSleepEnabled=");
     cfgOut->println(bleIdleSleepEnabled ? "1" : "0");
+    cfgOut->print("bleIdleLightMs=");
+    cfgOut->println(bleIdleLightMs);
+    cfgOut->print("bleIdleMediumMs=");
+    cfgOut->println(bleIdleMediumMs);
     cfgOut->print("bleIdleSleepMs=");
     cfgOut->println(bleIdleSleepMs);
+    cfgOut->print("lightIdleRate=");
+    cfgOut->println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
     cfgOut->print("leftTopType=");
     cfgOut->println(typeToString(leftTopZone.type));
     cfgOut->print("leftTopButtons=");
@@ -684,9 +803,24 @@ void processCommand(const String& line) {
       cfgOut->println(bleIdleSleepEnabled ? "1" : "0");
       return;
     }
+    if (key.equalsIgnoreCase("bleIdleLightMs")) {
+      cfgOut->print("bleIdleLightMs=");
+      cfgOut->println(bleIdleLightMs);
+      return;
+    }
+    if (key.equalsIgnoreCase("bleIdleMediumMs")) {
+      cfgOut->print("bleIdleMediumMs=");
+      cfgOut->println(bleIdleMediumMs);
+      return;
+    }
     if (key.equalsIgnoreCase("bleIdleSleepMs")) {
       cfgOut->print("bleIdleSleepMs=");
       cfgOut->println(bleIdleSleepMs);
+      return;
+    }
+    if (key.equalsIgnoreCase("lightIdleRate")) {
+      cfgOut->print("lightIdleRate=");
+      cfgOut->println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
       return;
     }
     if (key.equalsIgnoreCase("leftTopType")) {
@@ -990,6 +1124,7 @@ void processCommand(const String& line) {
       if (v >= 10 && v <= 200) {
         reportIntervalMs = (uint32_t)(1000 / v);
         if (reportIntervalMs == 0) reportIntervalMs = 1;
+        normalizeIdleThresholds();
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1024,6 +1159,41 @@ void processCommand(const String& line) {
       long v = valueStr.toInt();
       if (v >= 1000 && v <= 3600000) {
         bleIdleSleepMs = (unsigned long)v;
+        normalizeIdleThresholds();
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("bleIdleLightMs")) {
+      long v = valueStr.toInt();
+      if (v >= 1000 && v <= 3600000) {
+        bleIdleLightMs = (unsigned long)v;
+        normalizeIdleThresholds();
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("bleIdleMediumMs")) {
+      long v = valueStr.toInt();
+      if (v >= 1000 && v <= 3600000) {
+        bleIdleMediumMs = (unsigned long)v;
+        normalizeIdleThresholds();
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("lightIdleRate")) {
+      int v = valueStr.toInt();
+      if (v >= 5 && v <= 120) {
+        lightIdleReportIntervalMs = (uint32_t)(1000 / v);
+        if (lightIdleReportIntervalMs == 0) lightIdleReportIntervalMs = 1;
+        normalizeIdleThresholds();
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -1486,9 +1656,21 @@ bool loadConfig() {
       useBleWhenUsb = (value == "1" || value.equalsIgnoreCase("true"));
     } else if (key.equalsIgnoreCase("bleIdleSleepEnabled")) {
       bleIdleSleepEnabled = (value == "1" || value.equalsIgnoreCase("true"));
+    } else if (key.equalsIgnoreCase("bleIdleLightMs")) {
+      long v = value.toInt();
+      if (v >= 1000 && v <= 3600000) bleIdleLightMs = (unsigned long)v;
+    } else if (key.equalsIgnoreCase("bleIdleMediumMs")) {
+      long v = value.toInt();
+      if (v >= 1000 && v <= 3600000) bleIdleMediumMs = (unsigned long)v;
     } else if (key.equalsIgnoreCase("bleIdleSleepMs")) {
       long v = value.toInt();
       if (v >= 1000 && v <= 3600000) bleIdleSleepMs = (unsigned long)v;
+    } else if (key.equalsIgnoreCase("lightIdleRate")) {
+      int v = value.toInt();
+      if (v >= 5 && v <= 120) {
+        lightIdleReportIntervalMs = (uint32_t)(1000 / v);
+        if (lightIdleReportIntervalMs == 0) lightIdleReportIntervalMs = 1;
+      }
     } else if (key.equalsIgnoreCase("leftTopType")) {
       ZoneType type;
       if (parseType(value, &type)) leftTopZone.type = type;
@@ -1605,6 +1787,7 @@ bool loadConfig() {
       }
     }
   }
+  normalizeIdleThresholds();
   f.close();
   return true;
 }
@@ -1642,8 +1825,14 @@ bool saveConfig() {
   f.println(useBleWhenUsb ? "1" : "0");
   f.print("bleIdleSleepEnabled=");
   f.println(bleIdleSleepEnabled ? "1" : "0");
+  f.print("bleIdleLightMs=");
+  f.println(bleIdleLightMs);
+  f.print("bleIdleMediumMs=");
+  f.println(bleIdleMediumMs);
   f.print("bleIdleSleepMs=");
   f.println(bleIdleSleepMs);
+  f.print("lightIdleRate=");
+  f.println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
   f.print("leftTopType=");
   f.println(typeToString(leftTopZone.type));
   f.print("leftTopButtons=");
@@ -2092,7 +2281,7 @@ void readInputReport() {
   for (uint16_t i = 0; i < len; i++) reportBuf[i] = Wire.read();
 
   handleReport(reportBuf, len);
-  lastActivityMs = millis();
+  markActivity();
 
   waitIntRelease(INT_RELEASE_TIMEOUT_US);
 }
