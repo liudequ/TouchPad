@@ -12,8 +12,8 @@ wall_thickness  = 2;
 bottom_thickness = 2;
 
 // USB opening on front wall (long side)
-usb_width  = 8.8; // horizontal (X)
-usb_height = 4;   // vertical (Z)
+usb_width  = 9.2; // horizontal (X)
+usb_height = 4.5; // vertical (Z)
 
 outer_length = inner_length + 2 * wall_thickness;
 outer_width  = inner_width  + 2 * wall_thickness;
