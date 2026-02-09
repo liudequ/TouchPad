@@ -78,6 +78,8 @@ extern const uint32_t g_ADigitalPinMap[];
 
 static Print* cfgOut = &Serial;
 static bool lastUsbMounted = false;
+static bool lastBleConnected = false;
+static bool waitFingerReleaseAfterReconnect = false;
 static bool useBleWhenUsb = false;
 static bool bleIdleSleepEnabled = false;
 static unsigned long bleIdleLightMs = IDLE_SLEEP_MS;
@@ -123,6 +125,8 @@ bool useBleTransport() {
 void normalizeIdleThresholds();
 uint32_t effectiveReportIntervalMs();
 void leaveIdlePowerStage();
+void resetGestureState();
+void updateConnectionState();
 void enterIdleLightStage();
 void enterIdleMediumStage();
 void handleIdlePower(unsigned long now);
@@ -314,6 +318,57 @@ ZoneBinding fourDownBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding fourTapBinding = { ZONE_NONE, 0, 0, 0 };
 ZoneBinding fourDoubleTapBinding = { ZONE_NONE, 0, 0, 0 };
 
+void resetGestureState() {
+  unsigned long now = millis();
+  mode = MODE_NONE;
+  lastX1 = lastY1 = 0;
+  lastX2 = lastY2 = 0;
+  lastTouchTime = now;
+  lastScrollTime = now;
+
+  tripleStartX = tripleStartY = 0;
+  tripleLastX = tripleLastY = 0;
+  tripleStartTime = 0;
+  pendingThreeTap = false;
+  lastThreeTapTime = 0;
+  lastThreeTapX = lastThreeTapY = 0;
+
+  quadStartX = quadStartY = 0;
+  quadLastX = quadLastY = 0;
+  quadStartTime = 0;
+  pendingFourTap = false;
+  lastFourTapTime = 0;
+  lastFourTapX = lastFourTapY = 0;
+
+  smoothDx = smoothDy = 0;
+  accumX = accumY = 0;
+  velX = velY = 0;
+  lastReportMs = now;
+
+  smoothScroll = 0;
+  accumScroll = 0;
+  scrollVel = 0;
+  lastScrollReportMs = now;
+
+  tapCandidate = false;
+  tapStartTime = 0;
+  tapStartX = tapStartY = 0;
+  pendingClick = false;
+  lastTapTime = 0;
+  lastTapX = lastTapY = 0;
+}
+
+void updateConnectionState() {
+  bool bleConnected = Bluefruit.connected();
+  if (bleConnected != lastBleConnected) {
+    lastBleConnected = bleConnected;
+    resetGestureState();
+    if (bleConnected) {
+      waitFingerReleaseAfterReconnect = true;
+    }
+  }
+}
+
 void normalizeIdleThresholds() {
   if (bleIdleLightMs < 1000) bleIdleLightMs = 1000;
   if (bleIdleMediumMs <= bleIdleLightMs) bleIdleMediumMs = bleIdleLightMs + 1000;
@@ -493,7 +548,9 @@ void updateTransport() {
   bool usbMounted = isUsbMounted();
   if (usbMounted == lastUsbMounted) return;
   lastUsbMounted = usbMounted;
+  resetGestureState();
   if (usbMounted) {
+    waitFingerReleaseAfterReconnect = true;
     bool leavingIdle = (powerStage != POWER_ACTIVE) || advSuppressedByIdle;
     advSuppressedByIdle = false;
     powerStage = POWER_ACTIVE;
@@ -649,6 +706,7 @@ bool parseType(const String& value, ZoneType* out) {
 void loop() {
   handleSerial();
   updateTransport();
+  updateConnectionState();
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
   }
@@ -2988,6 +3046,16 @@ void handleReport(uint8_t* buf, uint16_t len) {
   bool f2 = s1 & 0x02;
   bool f3 = (len >= 18) ? (s2 & 0x02) : false;
   bool f4 = (len >= 23) ? (s3 & 0x02) : false;
+  bool anyFinger = f1 || f2 || f3 || f4;
+
+  if (waitFingerReleaseAfterReconnect) {
+    if (anyFinger) {
+      lastTouchTime = millis();
+      return;
+    }
+    waitFingerReleaseAfterReconnect = false;
+    return;
+  }
 
   int16_t x1 = buf[4] | (buf[5] << 8);
   int16_t y1 = buf[6] | (buf[7] << 8);
