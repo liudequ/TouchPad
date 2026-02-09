@@ -5,22 +5,47 @@
 #define INPUT_REG_L     0x09
 #define INPUT_REG_H     0x01
 
-/* ===== INT 引脚 ===== */
+/* ===== 引脚配置 ===== */
+#if defined(ARDUINO_ARCH_NRF52)
+#define SDA_PIN         6
+#define SCL_PIN         7
+#define INT_PIN         8
+#define TP_EN           9
+#else
 #define INT_PIN         10   // 按你的实际连线
+#endif
 
 /* ===== 缓冲区 ===== */
 uint8_t reportBuf[256];
 
+void touchColdBoot() {
+#if defined(ARDUINO_ARCH_NRF52)
+  pinMode(TP_EN, OUTPUT);
+  digitalWrite(TP_EN, LOW);
+  delay(20);
+  digitalWrite(TP_EN, HIGH);
+  delay(150);
+#endif
+}
+
 void setup() {
   Serial.begin(115200);
-  while (!Serial) {}
+  unsigned long serialStart = millis();
+  while (!Serial && (millis() - serialStart < 2000)) {
+    delay(10);
+  }
 
+  touchColdBoot();
+
+#if defined(ARDUINO_ARCH_NRF52)
+  Wire.setPins(SDA_PIN, SCL_PIN);
+#endif
   Wire.begin();
   Wire.setClock(400000);
 
   pinMode(INT_PIN, INPUT_PULLUP);
 
-  Serial.println("=== I2C-HID Report Dump Tool ===");
+  Serial.println("=== I2C-HID Report Dump Tool nice!nano v2 ===");
   Serial.println("Waiting for touch...");
 }
 

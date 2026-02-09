@@ -1,0 +1,2 @@
+# Linux 下若未安装 adafruit-nrfutil，跳过 zip 生成步骤以保证可编译。
+tools.nrfutil.cmd.linux=echo

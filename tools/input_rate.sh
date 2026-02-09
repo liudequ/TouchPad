@@ -49,7 +49,14 @@ echo "[info] reading ${DEV}. Press Ctrl+C to stop." >&2
 
 # Parse evtest stream and print events/sec.
 # evtest prints lines like: "Event: time 1700000000.123456, type ..."
-evtest "${DEV}" 2>&1 | awk '
+# Force line-buffered output from evtest to avoid bursty stats on some hosts.
+if command -v stdbuf >/dev/null 2>&1; then
+  EVTEST_CMD=(stdbuf -oL -eL evtest "${DEV}")
+else
+  EVTEST_CMD=(evtest "${DEV}")
+fi
+
+"${EVTEST_CMD[@]}" 2>&1 | awk '
   BEGIN { last = -1; count = 0 }
   /^Event: time/ {
     t = $3; sub(/,/, "", t)
