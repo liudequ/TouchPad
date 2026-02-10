@@ -16,10 +16,10 @@
 #define INPUT_REG_H 0x01
 
 // nice!nano v2 pin mapping
-#define SDA_PIN 7
-#define SCL_PIN 6
-#define INT_PIN 8
-#define TP_EN 9  // TouchPad ENABLE
+#define SDA_PIN 8
+#define SCL_PIN 9
+#define INT_PIN 7
+#define TP_EN 6  // TouchPad ENABLE
 
 uint8_t reportBuf[128];
 const unsigned long IDLE_SLEEP_MS = 60000;

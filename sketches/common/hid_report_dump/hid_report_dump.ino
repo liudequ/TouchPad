@@ -7,10 +7,10 @@
 
 /* ===== 引脚配置 ===== */
 #if defined(ARDUINO_ARCH_NRF52)
-#define SDA_PIN         7
-#define SCL_PIN         6
-#define INT_PIN         8
-#define TP_EN           9
+#define SDA_PIN         8
+#define SCL_PIN         9
+#define INT_PIN         7
+#define TP_EN           6
 #else
 #define INT_PIN         10   // 按你的实际连线
 #endif
