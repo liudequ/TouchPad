@@ -2,8 +2,8 @@
 #include <Adafruit_TinyUSB.h>
 
 // nRF52840 SuperMini pin mapping (方案 A)
-#define SDA_PIN 8
-#define SCL_PIN 9
+#define SDA_PIN 9
+#define SCL_PIN 8
 #define INT_PIN 7
 #define TP_EN 6
 

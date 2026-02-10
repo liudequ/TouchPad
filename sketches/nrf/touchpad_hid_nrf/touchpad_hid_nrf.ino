@@ -16,8 +16,8 @@
 #define INPUT_REG_H 0x01
 
 // nice!nano v2 pin mapping
-#define SDA_PIN 8
-#define SCL_PIN 9
+#define SDA_PIN 9
+#define SCL_PIN 8
 #define INT_PIN 7
 #define TP_EN 6  // TouchPad ENABLE
 

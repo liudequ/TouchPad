@@ -2,8 +2,8 @@
 
 ## nRF52840 SuperMini / nice!nano v2（当前方案）
 - Pin6 VCC -> 3V3
-- Pin5 SCL -> D9
-- Pin4 SDA -> D8
+- Pin5 SCL -> D8
+- Pin4 SDA -> D9
 - Pin3 INT -> D7
 - Pin2 ENABLE -> D6
 - Pin1 GND -> GND
