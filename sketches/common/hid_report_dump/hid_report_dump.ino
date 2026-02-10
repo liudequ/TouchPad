@@ -7,8 +7,8 @@
 
 /* ===== 引脚配置 ===== */
 #if defined(ARDUINO_ARCH_NRF52)
-#define SDA_PIN         6
-#define SCL_PIN         7
+#define SDA_PIN         7
+#define SCL_PIN         6
 #define INT_PIN         8
 #define TP_EN           9
 #else
