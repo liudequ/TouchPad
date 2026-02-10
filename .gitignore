@@ -11,6 +11,9 @@
 *.so
 *.log
 
+# Keep required nRF crypto precompiled static lib tracked
+!hardware/pdcook/nrf52/libraries/Adafruit_nRFCrypto/src/cortex-m4/fpv4-sp-d16-hard/libnrf_cc310_0.9.13-no-interrupts.a
+
 # Arduino IDE/CLI temporary files
 *.tmp
 *.bak
