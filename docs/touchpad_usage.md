@@ -51,6 +51,7 @@
 HELP
 GET
 GET <key>
+GET battery
 SET <key> <value>
 SAVE
 LOAD
@@ -68,6 +69,7 @@ PAIRCLR
 - 四指动作：`fourLeft*`、`fourRight*`、`fourUp*`、`fourDown*`、`fourTap*`、`fourDoubleTap*`
 - 四指阈值：`fourSwipeThresholdX`、`fourSwipeThresholdY`、`fourSwipeTimeout`、`fourSwipeCooldown`
 - 连接/省电：`useBleWhenUsb`、`bleIdleSleepEnabled`、`bleIdleLightMs`、`bleIdleMediumMs`、`bleIdleSleepMs`、`lightIdleRate`
+- 电量查询：`GET battery`（返回 `batteryMv` 与 `battery` 百分比）
 
 ## 三阶段省电策略
 当 `bleIdleSleepEnabled=1` 且使用 BLE 传输时，固件会按空闲时长进入三阶段省电：

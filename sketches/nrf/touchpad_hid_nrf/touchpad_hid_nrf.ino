@@ -53,6 +53,7 @@ uint8_t const hid_report_descriptor[] = {
 
 BLEDis bledis;
 BLEHidAdafruit blehid;
+BLEBas blebas;
 using namespace Adafruit_LittleFS_Namespace;
 
 // SoftDevice connection config (increase HVN queue to reduce notify blocking)
@@ -86,6 +87,11 @@ static unsigned long bleIdleLightMs = IDLE_SLEEP_MS;
 static unsigned long bleIdleMediumMs = IDLE_SLEEP_MS * 3;
 static unsigned long bleIdleSleepMs = IDLE_SLEEP_MS * 10;
 static uint32_t lightIdleReportIntervalMs = 33;
+static uint16_t batteryMilliVolts = 0;
+static uint8_t batteryPercent = 0;
+static bool batteryReady = false;
+static unsigned long lastBatterySampleMs = 0;
+static const unsigned long kBatterySampleIntervalMs = 60000;
 
 enum PowerStage {
   POWER_ACTIVE = 0,
@@ -131,6 +137,10 @@ void enterIdleLightStage();
 void enterIdleMediumStage();
 void handleIdlePower(unsigned long now);
 void markActivity();
+uint16_t readBatteryMilliVolts();
+uint8_t batteryPercentFromMilliVolts(uint16_t mv);
+void refreshBatteryStatus(bool forceNotify);
+void handleBattery(unsigned long now);
 
 void writeStatusLed(bool on) {
   if (ledStateOn == on) return;
@@ -446,6 +456,64 @@ void markActivity() {
   leaveIdlePowerStage();
 }
 
+uint16_t readBatteryMilliVolts() {
+#if defined(ARDUINO_ARCH_NRF52) && defined(SAADC_CH_PSELP_PSELP_VDDHDIV5)
+  analogReference(AR_INTERNAL_3_0);
+  analogReadResolution(12);
+  delay(1);
+  uint32_t raw = analogReadVDDHDIV5();
+  analogReference(AR_DEFAULT);
+  analogReadResolution(10);
+
+  // VDDH/5, 12-bit, 0..3.0V reference.
+  float mv = ((float)raw * 3000.0f / 4095.0f) * 5.0f;
+  if (mv < 0.0f) mv = 0.0f;
+  if (mv > 65535.0f) mv = 65535.0f;
+  return (uint16_t)(mv + 0.5f);
+#else
+  return 0;
+#endif
+}
+
+uint8_t batteryPercentFromMilliVolts(uint16_t mv) {
+  if (mv <= 3300) return 0;
+  if (mv < 3600) return (uint8_t)((mv - 3300) / 30);
+  if (mv >= 4200) return 100;
+
+  uint32_t delta = (uint32_t)(mv - 3600);
+  uint8_t percent = (uint8_t)(10 + (delta * 90UL) / 600UL);
+  if (percent > 100) percent = 100;
+  return percent;
+}
+
+void refreshBatteryStatus(bool forceNotify) {
+  uint16_t mv = readBatteryMilliVolts();
+  if (mv == 0) return;
+  uint8_t percent = batteryPercentFromMilliVolts(mv);
+
+  bool changed = (!batteryReady) || (percent != batteryPercent);
+  batteryMilliVolts = mv;
+  batteryPercent = percent;
+  batteryReady = true;
+
+  if (!changed && !forceNotify) return;
+  blebas.write(batteryPercent);
+  if (Bluefruit.connected()) {
+    blebas.notify(batteryPercent);
+  }
+}
+
+void handleBattery(unsigned long now) {
+  if (!batteryReady) {
+    lastBatterySampleMs = now;
+    refreshBatteryStatus(false);
+    return;
+  }
+  if (now - lastBatterySampleMs < kBatterySampleIntervalMs) return;
+  lastBatterySampleMs = now;
+  refreshBatteryStatus(false);
+}
+
 void applyDefaults() {
   sensitivity = 0.3f;
   smoothFactor = 0.5f;
@@ -538,6 +606,7 @@ void startAdv() {
   Bluefruit.Advertising.addName();
   Bluefruit.Advertising.addAppearance(BLE_APPEARANCE_HID_MOUSE);
   Bluefruit.Advertising.addService(blehid);
+  Bluefruit.Advertising.addService(blebas);
   Bluefruit.Advertising.setInterval(32, 244);
   Bluefruit.Advertising.setFastTimeout(30);
   Bluefruit.Advertising.restartOnDisconnect(true);
@@ -591,7 +660,9 @@ void initBle() {
   bledis.setModel("NRF52840");
   bledis.begin();
 
+  blebas.begin();
   blehid.begin();
+  refreshBatteryStatus(true);
   startAdv();
 }
 
@@ -711,6 +782,7 @@ void loop() {
     readInputReport();
   }
   unsigned long now = millis();
+  handleBattery(now);
   updateStatusLed(now);
   handleIdlePower(now);
   now = millis();
@@ -819,6 +891,7 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: GET bleIdleMediumMs");
     cfgOut->println("CMD: GET bleIdleSleepMs");
     cfgOut->println("CMD: GET lightIdleRate");
+    cfgOut->println("CMD: GET battery");
     return;
   }
 
@@ -867,6 +940,13 @@ void processCommand(const String& line) {
     cfgOut->println(bleIdleSleepMs);
     cfgOut->print("lightIdleRate=");
     cfgOut->println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
+    if (!batteryReady) {
+      refreshBatteryStatus(false);
+    }
+    cfgOut->print("batteryMv=");
+    cfgOut->println(batteryMilliVolts);
+    cfgOut->print("battery=");
+    cfgOut->println(batteryPercent);
     cfgOut->print("leftTopType=");
     cfgOut->println(typeToString(leftTopZone.type));
     cfgOut->print("leftTopButtons=");
@@ -1100,6 +1180,14 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("lightIdleRate")) {
       cfgOut->print("lightIdleRate=");
       cfgOut->println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
+      return;
+    }
+    if (key.equalsIgnoreCase("battery")) {
+      refreshBatteryStatus(false);
+      cfgOut->print("batteryMv=");
+      cfgOut->println(batteryMilliVolts);
+      cfgOut->print("battery=");
+      cfgOut->println(batteryPercent);
       return;
     }
     if (key.equalsIgnoreCase("leftTopType")) {
