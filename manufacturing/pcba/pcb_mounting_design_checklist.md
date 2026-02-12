@@ -106,11 +106,11 @@
 ---
 
 ## 7. 本仓库配套参考
-- 网络连接：`Product-TouchPad/manufacturing/pcba/netlist_nicenano_baseboard.md`
-- 器件选型：`Product-TouchPad/manufacturing/pcba/component_selection.md`
-- EDA流程：`Product-TouchPad/manufacturing/pcba/jlc_eda_workflow.md`
+- 网络连接：`manufacturing/pcba/netlist_nicenano_baseboard.md`
+- 器件选型：`manufacturing/pcba/component_selection.md`
+- EDA流程：`manufacturing/pcba/jlc_eda_workflow.md`
 - FPC定义：`docs/fpc_pinout.md`
-- 固件引脚：`sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`
+- 固件引脚：`sketches/product/touchpad_hid_nrf/touchpad_hid_nrf.ino`
 
 ---
 

@@ -1,21 +1,24 @@
 # 仓库指南
 
 ## 项目结构与模块组织
-这是一个 Arduino 草图集合仓库。所有可编译草图放在 `sketches/` 下，并按 `common/`、`nrf/` 分组，每个草图一个独立文件夹，且 `.ino` 文件名与文件夹名一致：
+这是一个 Arduino 草图集合仓库。所有可编译草图放在 `sketches/` 下，并按 `product/`、`tools/`、`experiments/` 分组，每个草图一个独立文件夹，且 `.ino` 文件名与文件夹名一致：
 
-- `sketches/common/blink/blink.ino`
-- `sketches/common/ps2_scan/ps2_scan.ino`
-- `sketches/common/hid_report_dump/hid_report_dump.ino`
-- `sketches/common/two_finger_tuning/two_finger_tuning.ino`
-- `sketches/common/try_read_data/try_read_data.ino`
-- `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`
-- `sketches/nrf/touchpad_i2c_probe_nrf/touchpad_i2c_probe_nrf.ino`
-- `sketches/nrf/ble_conn_test/ble_conn_test.ino`
-- `sketches/nrf/ble_hid_rate_test/ble_hid_rate_test.ino`
-- `sketches/nrf/serial_alive_nicenano/serial_alive_nicenano.ino`
+- `sketches/tools/blink/blink.ino`
+- `sketches/tools/ps2_scan/ps2_scan.ino`
+- `sketches/tools/hid_report_dump/hid_report_dump.ino`
+- `sketches/experiments/two_finger_tuning/two_finger_tuning.ino`
+- `sketches/tools/try_read_data/try_read_data.ino`
+- `sketches/product/touchpad_hid_nrf/touchpad_hid_nrf.ino`
+- `sketches/tools/touchpad_i2c_probe_nrf/touchpad_i2c_probe_nrf.ino`
+- `sketches/tools/ble_conn_test/ble_conn_test.ino`
+- `sketches/tools/ble_hid_rate_test/ble_hid_rate_test.ino`
+- `sketches/tools/serial_alive_nicenano/serial_alive_nicenano.ino`
+- `sketches/tools/led_test_nicenano/led_test_nicenano.ino`
+- `sketches/tools/soft_switch_test/soft_switch_test.ino`
 
-文档放在 `docs/`。每个草图自包含、互不依赖。
+文档放在 `docs/`（索引见 `docs/README.md`）。每个草图自包含、互不依赖。
 3D 模型放在 `models/`，用于外壳设计与打印参考。
+制造资料入口见 `manufacturing/README.md`。
 
 ## 文档说明（docs）
 - `docs/touchpad_usage.md`：nRF 触摸板使用说明（接线、烧录、操作、串口命令与 UI 配置）。
@@ -48,13 +51,13 @@
 可选：若需要命令行编译，可使用 Arduino CLI：
 - `arduino-cli compile --fqbn <board_fqbn> <sketch_path>`
 
-将 `<board_fqbn>` 替换为实际板卡，将 `<sketch_path>` 替换为草图路径（如 `sketches/nrf/touchpad_hid_nrf`）。
+将 `<board_fqbn>` 替换为实际板卡，将 `<sketch_path>` 替换为草图路径（如 `sketches/product/touchpad_hid_nrf`）。
 
 ## 代码风格与命名规范
 - 采用标准 Arduino C++ 风格：2 空格缩进、K&R 花括号风格、清晰的函数命名。
 - 变量命名应具描述性，尽量减少全局变量。
-- 草图文件名与其所在目录保持一致（如 `sketches/common/ps2_scan/ps2_scan.ino`）。
-- 触摸板主逻辑改动优先同步更新 `sketches/nrf/touchpad_hid_nrf` 与相关文档（如 `docs/touchpad_usage.md`）。
+- 草图文件名与其所在目录保持一致（如 `sketches/tools/ps2_scan/ps2_scan.ino`）。
+- 触摸板主逻辑改动优先同步更新 `sketches/product/touchpad_hid_nrf` 与相关文档（如 `docs/touchpad_usage.md`）。
 - 串口/日志输出尽量使用中文。
 
 ## 测试指南
@@ -77,8 +80,9 @@
 ## 触摸板代码概览
 这是一个触摸板项目。关键草图及职责如下：
 
-- `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino`：nRF 主触摸板实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、三指/四指手势、点击/双击、USB/BLE HID 输出、省电分级、配置持久化）。
-- `sketches/common/two_finger_tuning/two_finger_tuning.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
-- `sketches/common/hid_report_dump/hid_report_dump.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
-- `sketches/common/try_read_data/try_read_data.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
-- `sketches/nrf/touchpad_i2c_probe_nrf/touchpad_i2c_probe_nrf.ino`：nRF 侧 I2C 触摸板探测工具（用于定位触摸控制器地址与连线确认）。
+- `sketches/product/touchpad_hid_nrf/touchpad_hid_nrf.ino`：nRF 主触摸板实现（I2C-HID 读取 `0x2C`/`0x0109`，单指移动、双指滚动、三指/四指手势、点击/双击、USB/BLE HID 输出、省电分级、配置持久化）。
+- `sketches/product/touchpad_hid_nrf/modules/`：触摸板主草图的功能模块拆分（电源/电量、BLE 传输、HID 输出）。
+- `sketches/experiments/two_finger_tuning/two_finger_tuning.ino`：触摸到鼠标映射的实验版本，带报文打印，重点是单指/双指的平滑与加速。
+- `sketches/tools/hid_report_dump/hid_report_dump.ino`：I2C-HID 报文抓取与十六进制打印，便于理解原始输入帧。
+- `sketches/tools/try_read_data/try_read_data.ino`：Goodix 风格寄存器盲读工具（`0x8100`）及状态清理。
+- `sketches/tools/touchpad_i2c_probe_nrf/touchpad_i2c_probe_nrf.ino`：nRF 侧 I2C 触摸板探测工具（用于定位触摸控制器地址与连线确认）。

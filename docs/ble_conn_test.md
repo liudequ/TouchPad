@@ -1,6 +1,6 @@
 # BLE 连接测试
 
-这是 `sketches/nrf/ble_conn_test/ble_conn_test.ino` 在 nRF52840 上的人工测试用例
+这是 `sketches/tools/ble_conn_test/ble_conn_test.ino` 在 nRF52840 上的人工测试用例
 （兼容 nice!nano v2.0）。
 
 ## 前置条件
@@ -10,7 +10,7 @@
 - 一台可连接 BLE HID + BLE UART 的手机或电脑
 
 ## 测试用例：BLE 连接 + HID/UART
-1) 编译并上传 `sketches/nrf/ble_conn_test` 到开发板。
+1) 编译并上传 `sketches/tools/ble_conn_test` 到开发板。
 2) 打开串口监视器，波特率 115200。
 3) 确认日志出现：`[ble] nRF52 BLE connection test`。
 4) 在手机/电脑上扫描 BLE 设备并连接 `TouchPadTest`。

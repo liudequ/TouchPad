@@ -1,6 +1,6 @@
 # 蓝牙改造记录（历史）
 
-> 说明：本文件主要保留迁移过程记录；当前实现以 `sketches/nrf/touchpad_hid_nrf/touchpad_hid_nrf.ino` 为准。
+> 说明：本文件主要保留迁移过程记录；当前实现以 `sketches/product/touchpad_hid_nrf/touchpad_hid_nrf.ino` 为准。
 
 ## 目标
 将触摸板迁移到 nRF52840，实现 BLE HID，并保留 USB 使用路径。
