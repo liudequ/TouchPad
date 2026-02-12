@@ -5,6 +5,8 @@
 #include <InternalFileSystem.h>
 #include <Adafruit_TinyUSB.h>
 #include <bluefruit.h>
+#include <stdio.h>
+#include <string.h>
 #if defined(ARDUINO_ARCH_NRF52)
 #include <nrf.h>
 #include <nrf_gpio.h>
@@ -368,6 +370,7 @@ void resetGestureState() {
   lastTapX = lastTapY = 0;
 }
 
+#include "modules/touchpad_slot_manager.inc"
 #include "modules/touchpad_power_battery.inc"
 
 void applyDefaults() {
@@ -414,6 +417,8 @@ void applyDefaults() {
   pendingClick = false;
   pendingThreeTap = false;
   pendingFourTap = false;
+  slotManagerEnabled = false;
+  slotResetAll();
   normalizeIdleThresholds();
 }
 
@@ -489,11 +494,13 @@ void onConnect(uint16_t conn_handle) {
   if (connection) {
     connection->requestConnectionParameter(12, 0, 400);
   }
+  slotOnConnect(conn_handle);
 }
 
 void onDisconnect(uint16_t conn_handle, uint8_t reason) {
   (void)conn_handle;
   (void)reason;
+  slotOnDisconnect();
   if (advSuppressedByIdle) {
     Bluefruit.Advertising.stop();
   }
@@ -676,9 +683,16 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: LOAD");
     cfgOut->println("CMD: RESET");
     cfgOut->println("CMD: BOOT");
+    cfgOut->println("CMD: INFO SLOT");
     cfgOut->println("CMD: PAIRCLR");
+    cfgOut->println("CMD: SLOT <1|2|3>");
+    cfgOut->println("CMD: PAIR SLOT <1|2|3>");
+    cfgOut->println("CMD: PAIR SLOT <1|2|3> FORCE");
+    cfgOut->println("CMD: UNPAIR SLOT <1|2|3>");
     cfgOut->println("CMD: GET useBleWhenUsb");
     cfgOut->println("CMD: GET bleIdleSleepEnabled");
+    cfgOut->println("CMD: GET slotManagerEnabled");
+    cfgOut->println("CMD: GET slot");
     cfgOut->println("CMD: GET bleIdleLightMs");
     cfgOut->println("CMD: GET bleIdleMediumMs");
     cfgOut->println("CMD: GET bleIdleSleepMs");
@@ -739,6 +753,7 @@ void processCommand(const String& line) {
     cfgOut->println(batteryMilliVolts);
     cfgOut->print("battery=");
     cfgOut->println(batteryPercent);
+    slotPrintStatus();
     cfgOut->print("leftTopType=");
     cfgOut->println(typeToString(leftTopZone.type));
     cfgOut->print("leftTopButtons=");
@@ -947,6 +962,15 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("useBleWhenUsb")) {
       cfgOut->print("useBleWhenUsb=");
       cfgOut->println(useBleWhenUsb ? "1" : "0");
+      return;
+    }
+    if (key.equalsIgnoreCase("slotManagerEnabled")) {
+      cfgOut->print("slotManagerEnabled=");
+      cfgOut->println(slotManagerEnabled ? "1" : "0");
+      return;
+    }
+    if (key.equalsIgnoreCase("slot")) {
+      slotPrintStatus();
       return;
     }
     if (key.equalsIgnoreCase("bleIdleSleepEnabled")) {
@@ -1476,6 +1500,20 @@ void processCommand(const String& line) {
         cfgOut->println("OK");
       } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
         useBleWhenUsb = false;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("slotManagerEnabled")) {
+      if (valueStr.equalsIgnoreCase("1") || valueStr.equalsIgnoreCase("true")) {
+        slotManagerEnabled = true;
+        cfgOut->println("OK");
+      } else if (valueStr.equalsIgnoreCase("0") || valueStr.equalsIgnoreCase("false")) {
+        slotManagerEnabled = false;
+        slotPairing = 0;
+        slotReplaceArmed = 0;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -2294,12 +2332,55 @@ void processCommand(const String& line) {
     return;
   }
 
+  if (line.equalsIgnoreCase("INFO SLOT")) {
+    slotPrintCompactStatus();
+    return;
+  }
+
+  if (line.startsWith("SLOT ")) {
+    if (!slotManagerEnabled) {
+      cfgOut->println("ERR: slot manager disabled");
+      return;
+    }
+    int v = line.substring(5).toInt();
+    if (!slotSelect((uint8_t)v)) return;
+    return;
+  }
+
+  if (line.startsWith("PAIR SLOT ")) {
+    String args = line.substring(10);
+    args.trim();
+    bool forceReplace = false;
+    int sp = args.indexOf(' ');
+    String slotStr = args;
+    if (sp >= 0) {
+      slotStr = args.substring(0, sp);
+      String opt = args.substring(sp + 1);
+      opt.trim();
+      forceReplace = opt.equalsIgnoreCase("FORCE");
+      if (!forceReplace) {
+        cfgOut->println("ERR: option");
+        return;
+      }
+    }
+    int v = slotStr.toInt();
+    if (!slotStartPair((uint8_t)v, forceReplace)) return;
+    return;
+  }
+
+  if (line.startsWith("UNPAIR SLOT ")) {
+    int v = line.substring(12).toInt();
+    if (!slotUnpair((uint8_t)v)) return;
+    return;
+  }
+
   if (line.equalsIgnoreCase("PAIRCLR")) {
     if (Bluefruit.connected()) {
       Bluefruit.disconnect(0);
       delay(50);
     }
     Bluefruit.Periph.clearBonds();
+    slotResetAll();
     cfgOut->println("OK");
     return;
   }
@@ -2370,6 +2451,8 @@ bool loadConfig() {
         lightIdleReportIntervalMs = (uint32_t)(1000 / v);
         if (lightIdleReportIntervalMs == 0) lightIdleReportIntervalMs = 1;
       }
+    } else if (slotLoadConfigEntry(key, value)) {
+      // handled by slot manager
     } else if (key.equalsIgnoreCase("leftTopType")) {
       ZoneType type;
       if (parseType(value, &type)) leftTopZone.type = type;
@@ -2640,6 +2723,7 @@ bool saveConfig() {
   f.println(bleIdleSleepMs);
   f.print("lightIdleRate=");
   f.println(lightIdleReportIntervalMs ? (1000 / lightIdleReportIntervalMs) : 0);
+  slotSaveConfig(f);
   f.print("leftTopType=");
   f.println(typeToString(leftTopZone.type));
   f.print("leftTopButtons=");

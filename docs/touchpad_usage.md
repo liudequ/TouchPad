@@ -52,7 +52,13 @@ HELP
 GET
 GET <key>
 GET battery
+GET slot
+INFO SLOT
 SET <key> <value>
+SLOT <1|2|3>
+PAIR SLOT <1|2|3>
+PAIR SLOT <1|2|3> FORCE
+UNPAIR SLOT <1|2|3>
 SAVE
 LOAD
 RESET
@@ -69,7 +75,12 @@ PAIRCLR
 - 四指动作：`fourLeft*`、`fourRight*`、`fourUp*`、`fourDown*`、`fourTap*`、`fourDoubleTap*`
 - 四指阈值：`fourSwipeThresholdX`、`fourSwipeThresholdY`、`fourSwipeTimeout`、`fourSwipeCooldown`
 - 连接/省电：`useBleWhenUsb`、`bleIdleSleepEnabled`、`bleIdleLightMs`、`bleIdleMediumMs`、`bleIdleSleepMs`、`lightIdleRate`
+- 槽位管理：`slotManagerEnabled`、`GET slot`、`INFO SLOT`、`SLOT n`、`PAIR SLOT n`、`PAIR SLOT n FORCE`、`UNPAIR SLOT n`
 - 电量查询：`GET battery`（返回 `batteryMv` 与 `battery` 百分比）
+
+槽位覆盖说明：
+- 当目标槽位已有绑定时，执行 `PAIR SLOT n` 会返回确认提示，不会直接覆盖。
+- 确认覆盖请使用：`PAIR SLOT n FORCE`。
 
 ## 三阶段省电策略
 当 `bleIdleSleepEnabled=1` 且使用 BLE 传输时，固件会按空闲时长进入三阶段省电：
