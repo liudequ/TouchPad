@@ -21,3 +21,4 @@
 
 ## 其它
 - `video_intro_flow.md`：介绍视频脚本流程。
+- `next_optimization_notes.md`：后续硬件优化清单（底板布局、开关形态、FPC 引脚定义）。
