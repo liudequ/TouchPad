@@ -143,6 +143,10 @@ uint16_t readBatteryMilliVolts();
 uint8_t batteryPercentFromMilliVolts(uint16_t mv);
 void refreshBatteryStatus(bool forceNotify);
 void handleBattery(unsigned long now);
+void sendMouseMove(int8_t x, int8_t y);
+void sendMouseWheel(int8_t wheel);
+void sendMouseClick(uint8_t buttons);
+void sendKeyboard(uint8_t modifier, uint8_t keycode);
 
 void writeStatusLed(bool on) {
   if (ledStateOn == on) return;
@@ -370,8 +374,8 @@ void resetGestureState() {
   lastTapX = lastTapY = 0;
 }
 
-#include "modules/touchpad_slot_manager.inc"
-#include "modules/touchpad_power_battery.inc"
+#include "modules/touchpad_slot_manager.h"
+#include "modules/touchpad_power_battery.h"
 
 void applyDefaults() {
   sensitivity = 0.3f;
@@ -461,7 +465,7 @@ void initUsbHid() {
   }
 }
 
-#include "modules/touchpad_ble_transport.inc"
+#include "modules/touchpad_ble_transport.h"
 
 void enterDeepSleep() {
 #if defined(ARDUINO_ARCH_NRF52)
@@ -2945,7 +2949,7 @@ void performTapBinding(bool* pendingTap,
   *lastTapPosY = tapY;
 }
 
-#include "modules/touchpad_hid_output.inc"
+#include "modules/touchpad_hid_output.h"
 
 /* ===========================
    Report 解析

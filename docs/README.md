@@ -14,7 +14,7 @@
 - `ble_conn_test.md`：`sketches/tools/ble_conn_test` 人工测试步骤。
 
 ## 硬件参考
-- `fpc_pinout.md`：FPC 转接板引脚定义。
+- `fpc_pinout.md`：FPC 转接板引脚定义（含已知问题：PCB 底板 FPC 方向设计反了）。
 - `schematic_nice_nano_v2.png`：nice!nano v2 原理图参考。
 - `nRF52840_PS_v1.1.pdf`：nRF52840 规格书。
 - `Promicro NRF52840开发板 兼容nice!nano V2.0 带蓝牙 充电管理-淘宝网.png`：开发板商品页截图。
