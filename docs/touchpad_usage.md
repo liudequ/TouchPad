@@ -140,6 +140,24 @@ python3 tools/ui/touchpad_config_ui.py
 tools/ui/run_ui.sh
 ```
 
+## Windows 运行与发布
+
+如果只是自己在 Windows 上运行，可按下面步骤：
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r tools\ui\requirements.txt
+python tools\ui\touchpad_config_ui.py
+```
+
+如果需要发给不懂 Python 的普通用户，建议直接打包成 Windows 安装包。仓库已提供：
+
+- `tools/ui/build_windows_exe.bat`：生成 `exe` 发布目录
+- `tools/ui/windows_installer.iss`：Inno Setup 安装器脚本
+
+详细流程见 `docs/windows_ui_packaging.md`。
+
 ## 串口权限（Linux）
 首次在新机器连接时，若遇到 `/dev/ttyACM0` 权限不足，可将当前用户加入 `dialout` 组：
 

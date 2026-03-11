@@ -4,6 +4,7 @@
 - `touchpad_usage.md`：触摸板接线、烧录、操作、串口命令、UI 配置。
 - `arduino_ide_supermini_setup.md`：Arduino IDE 板卡配置与 UF2 流程。
 - `bom.md`：物料与接线速查。
+- `windows_ui_packaging.md`：Windows 图形配置工具的打包与安装包发布流程。
 
 ## 功能与调参
 - `stability_tuning.md`：手感稳定性与防抖参数思路。
