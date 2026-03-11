@@ -229,6 +229,11 @@ float scrollSensitivity = 0.00002f;
 float scrollSmoothFactor = 0.2f;
 bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
+const uint32_t SCROLL_REPORT_INTERVAL_MS = 8;
+const float SCROLL_RELEASE_DECAY = 0.72f;
+const float SCROLL_VELOCITY_EPSILON = 0.02f;
+const float SCROLL_ACCUM_EPSILON = 0.02f;
+const int8_t SCROLL_MAX_STEP_PER_REPORT = 1;
 
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
@@ -603,9 +608,6 @@ void loop() {
   /*双指超时释放*/
   if (mode == MODE_DOUBLE && now - lastTouchTime > RELEASE_TIMEOUT) {
     mode = MODE_NONE;
-    scrollVel = 0;
-    smoothScroll = 0;
-    accumScroll = 0;
     lastScrollTime = now;
   }
 
@@ -640,17 +642,34 @@ void loop() {
     }
   }
 
-  if (mode == MODE_DOUBLE) {
-    accumScroll += scrollVel;
-    if (now - lastScrollReportMs >= effectiveReportIntervalMs()) {
-      lastScrollReportMs = now;
-      int16_t s16 = (int16_t)accumScroll;
-      s16 = constrain(s16, -127, 127);
-      int8_t s = (int8_t)s16;
-      if (s) {
-        sendMouseWheel(naturalScroll ? s : -s);
-        accumScroll -= s;
-      }
+  bool scrollActive = (mode == MODE_DOUBLE) || (abs(scrollVel) > SCROLL_VELOCITY_EPSILON) || (abs(accumScroll) > 1.0f);
+  if (scrollActive && now - lastScrollReportMs >= SCROLL_REPORT_INTERVAL_MS) {
+    unsigned long dtMs = now - lastScrollReportMs;
+    lastScrollReportMs = now;
+    float dt = dtMs / (float)SCROLL_REPORT_INTERVAL_MS;
+    if (dt > 2.0f) dt = 2.0f;
+
+    if (mode != MODE_DOUBLE) {
+      scrollVel *= SCROLL_RELEASE_DECAY;
+      smoothScroll *= SCROLL_RELEASE_DECAY;
+      if (abs(scrollVel) < SCROLL_VELOCITY_EPSILON) scrollVel = 0;
+      if (abs(smoothScroll) < SCROLL_VELOCITY_EPSILON) smoothScroll = 0;
+    }
+
+    accumScroll += scrollVel * dt;
+
+    int8_t s = 0;
+    if (accumScroll >= 1.0f) {
+      s = SCROLL_MAX_STEP_PER_REPORT;
+    } else if (accumScroll <= -1.0f) {
+      s = -SCROLL_MAX_STEP_PER_REPORT;
+    }
+
+    if (s) {
+      sendMouseWheel(naturalScroll ? s : -s);
+      accumScroll -= s;
+    } else if (mode != MODE_DOUBLE && abs(accumScroll) < SCROLL_ACCUM_EPSILON) {
+      accumScroll = 0;
     }
   }
 
@@ -3113,7 +3132,10 @@ void handleReport(uint8_t* buf, uint16_t len) {
       smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
       scrollVel = smoothScroll;
     } else {
-      smoothScroll = accumScroll = 0;
+      scrollVel = 0;
+      smoothScroll = 0;
+      if (abs(accumScroll) < 1.0f) accumScroll = 0;
+      lastScrollReportMs = now;
     }
 
     lastX1 = x1;
