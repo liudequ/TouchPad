@@ -144,7 +144,9 @@ uint8_t batteryPercentFromMilliVolts(uint16_t mv);
 void refreshBatteryStatus(bool forceNotify);
 void handleBattery(unsigned long now);
 void sendMouseMove(int8_t x, int8_t y);
+void sendMouseMoveWithButtons(int8_t x, int8_t y, uint8_t buttons);
 void sendMouseWheel(int8_t wheel);
+void sendMouseButtons(uint8_t buttons);
 void sendMouseClick(uint8_t buttons);
 void sendKeyboard(uint8_t modifier, uint8_t keycode);
 
@@ -237,6 +239,7 @@ const int8_t SCROLL_MAX_STEP_PER_REPORT = 1;
 
 // 点击与释放
 const unsigned long TAP_MAX_MS = 200;
+const unsigned long LONG_PRESS_DRAG_MS = 220;
 const unsigned long DOUBLE_TAP_WINDOW = 200;
 const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
 const unsigned long RELEASE_TIMEOUT = 30;
@@ -304,6 +307,7 @@ float scrollVel = 0;
 unsigned long lastScrollReportMs = 0;
 
 bool tapCandidate = false;
+bool dragActive = false;
 unsigned long tapStartTime = 0;
 int16_t tapStartX = 0;
 int16_t tapStartY = 0;
@@ -372,6 +376,7 @@ void resetGestureState() {
   lastScrollReportMs = now;
 
   tapCandidate = false;
+  dragActive = false;
   tapStartTime = 0;
   tapStartX = tapStartY = 0;
   pendingClick = false;
@@ -603,6 +608,8 @@ void loop() {
     smoothDx = smoothDy = 0;
     accumX = accumY = 0;
     tapCandidate = false;
+    if (dragActive) sendMouseButtons((uint8_t)0);
+    dragActive = false;
   }
 
   /*双指超时释放*/
@@ -619,7 +626,7 @@ void loop() {
   }
 
   /*连续输出*/
-  if (mode == MODE_SINGLE && !tapCandidate) {
+  if (mode == MODE_SINGLE && (!tapCandidate || dragActive)) {
     uint32_t intervalMs = effectiveReportIntervalMs();
     if (now - lastReportMs >= intervalMs) {
       unsigned long dtMs = now - lastReportMs;
@@ -635,7 +642,11 @@ void loop() {
       int8_t mx = (int8_t)mx16;
       int8_t my = (int8_t)my16;
       if (mx || my) {
-        sendMouseMove(mx, my);
+        if (dragActive) {
+          sendMouseMoveWithButtons(mx, my, MOUSE_BUTTON_LEFT);
+        } else {
+          sendMouseMove(mx, my);
+        }
         accumX -= mx;
         accumY -= my;
       }
@@ -3008,6 +3019,10 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 四指手势 =====*/
   if (f1 && f2 && f3 && f4) {
+    if (dragActive) {
+      sendMouseButtons((uint8_t)0);
+      dragActive = false;
+    }
     int16_t avgX = (x1 + x2 + x3 + x4) / 4;
     int16_t avgY = (y1 + y2 + y3 + y4) / 4;
     if (mode != MODE_QUAD) {
@@ -3124,6 +3139,10 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 双指滚动 =====*/
   if (f1 && f2) {
+    if (dragActive) {
+      sendMouseButtons((uint8_t)0);
+      dragActive = false;
+    }
     if (mode == MODE_DOUBLE) {
       int16_t dy = ((y1 - lastY1) + (y2 - lastY2)) / 2;
       dy = constrain(dy, -maxDelta, maxDelta);
@@ -3169,6 +3188,20 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
       if (tapCandidate) {
         uint16_t dist = abs(x1 - tapStartX) + abs(y1 - tapStartY);
+        if (dist <= DOUBLE_TAP_MAX_MOVE && now - tapStartTime >= LONG_PRESS_DRAG_MS) {
+          dragActive = true;
+          tapCandidate = false;
+          pendingClick = false;
+          velX = velY = 0;
+          smoothDx = smoothDy = 0;
+          accumX = accumY = 0;
+          lastReportMs = now;
+          lastX1 = x1;
+          lastY1 = y1;
+          sendMouseButtons(MOUSE_BUTTON_LEFT);
+          lastTouchTime = now;
+          return;
+        }
         if (dist <= DOUBLE_TAP_MAX_MOVE) {
           velX = velY = 0;
           smoothDx = smoothDy = 0;
@@ -3222,6 +3255,17 @@ void handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
+    if (dragActive) {
+      sendMouseButtons((uint8_t)0);
+      dragActive = false;
+      tapCandidate = false;
+      pendingClick = false;
+      mode = MODE_NONE;
+      velX = velY = 0;
+      smoothDx = smoothDy = 0;
+      accumX = accumY = 0;
+      return;
+    }
     if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
       tapCandidate = false;
       pendingClick = false;
