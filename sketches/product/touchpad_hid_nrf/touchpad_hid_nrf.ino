@@ -227,7 +227,7 @@ int16_t maxDelta = 60;
 int16_t moveDeadband = 1;
 
 // 双指滚动
-float scrollSensitivity = 0.00002f;
+float scrollSensitivity = 0.05f;
 float scrollSmoothFactor = 0.2f;
 bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
@@ -394,7 +394,7 @@ void applyDefaults() {
   maxAccel = 3.0f;
   maxDelta = 60;
   moveDeadband = 1;
-  scrollSensitivity = 0.00002f;
+  scrollSensitivity = 0.05f;
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
   enableNavZones = true;
