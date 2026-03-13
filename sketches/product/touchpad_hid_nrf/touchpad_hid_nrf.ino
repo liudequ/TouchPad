@@ -139,6 +139,7 @@ void enterIdleLightStage();
 void enterIdleMediumStage();
 void handleIdlePower(unsigned long now);
 void markActivity();
+void idleCpuUntilEvent();
 uint16_t readBatteryMilliVolts();
 uint8_t batteryPercentFromMilliVolts(uint16_t mv);
 void refreshBatteryStatus(bool forceNotify);
@@ -149,6 +150,7 @@ void sendMouseWheel(int8_t wheel);
 void sendMouseButtons(uint8_t buttons);
 void sendMouseClick(uint8_t buttons);
 void sendKeyboard(uint8_t modifier, uint8_t keycode);
+bool handleReport(uint8_t* buf, uint16_t len);
 
 void writeStatusLed(bool on) {
   if (ledStateOn == on) return;
@@ -208,6 +210,16 @@ void updateStatusLed(unsigned long now) {
       writeStatusLed(false);
       break;
   }
+}
+
+void idleCpuUntilEvent() {
+#if defined(ARDUINO_ARCH_NRF52)
+  __SEV();
+  __WFE();
+  __WFE();
+#else
+  delay(1);
+#endif
 }
 
 float applySingleFingerAxisResponse(int16_t delta, float axisScale) {
@@ -623,8 +635,10 @@ void loop() {
   handleSerial();
   updateTransport();
   updateConnectionState();
+  bool inputHandled = false;
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
+    inputHandled = true;
   }
   unsigned long now = millis();
   handleBattery(now);
@@ -719,6 +733,17 @@ void loop() {
   if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
     sendMouseClick(MOUSE_BUTTON_LEFT);
     pendingClick = false;
+  }
+
+  if (!inputHandled &&
+      digitalRead(INT_PIN) != LOW &&
+      mode == MODE_NONE &&
+      !scrollActive &&
+      !dragActive &&
+      !pendingClick &&
+      !pendingThreeTap &&
+      !pendingFourTap) {
+    idleCpuUntilEvent();
   }
 }
 
@@ -3016,8 +3041,8 @@ void performTapBinding(bool* pendingTap,
 /* ===========================
    Report 解析
    =========================== */
-void handleReport(uint8_t* buf, uint16_t len) {
-  if (len < 13) return;
+bool handleReport(uint8_t* buf, uint16_t len) {
+  if (len < 13) return false;
   uint8_t s0 = buf[3];
   uint8_t s1 = buf[8];
   uint8_t s2 = (len >= 18) ? buf[13] : 0;
@@ -3028,14 +3053,16 @@ void handleReport(uint8_t* buf, uint16_t len) {
   bool f3 = (len >= 18) ? (s2 & 0x02) : false;
   bool f4 = (len >= 23) ? (s3 & 0x02) : false;
   bool anyFinger = f1 || f2 || f3 || f4;
+  bool hadGestureState = (mode != MODE_NONE) || tapCandidate || dragActive || pendingClick ||
+                         pendingThreeTap || pendingFourTap;
 
   if (waitFingerReleaseAfterReconnect) {
     if (anyFinger) {
       lastTouchTime = millis();
-      return;
+      return false;
     }
     waitFingerReleaseAfterReconnect = false;
-    return;
+    return false;
   }
 
   int16_t x1 = buf[4] | (buf[5] << 8);
@@ -3070,7 +3097,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
     mode = MODE_QUAD;
     tapCandidate = false;
     lastTouchTime = now;
-    return;
+    return true;
   }
 
   if (mode == MODE_QUAD && !(f1 && f2 && f3 && f4)) {
@@ -3108,7 +3135,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       tapCandidate = false;
     }
     mode = MODE_NONE;
-    return;
+    return true;
   }
 
   /*===== 三指手势 =====*/
@@ -3128,7 +3155,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
     mode = MODE_TRIPLE;
     tapCandidate = false;
     lastTouchTime = now;
-    return;
+    return true;
   }
 
   if (mode == MODE_TRIPLE && !(f1 && f2 && f3)) {
@@ -3166,7 +3193,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       tapCandidate = false;
     }
     mode = MODE_NONE;
-    return;
+    return true;
   }
 
   /*===== 双指滚动 =====*/
@@ -3198,7 +3225,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
     tapCandidate = false;
     lastTouchTime = now;
     lastScrollTime = now;
-    return;
+    return true;
   }
 
   /*===== 单指移动 =====*/
@@ -3208,7 +3235,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       lastY1 = y1;
       mode = MODE_SINGLE;
       lastTouchTime = now;
-      return;
+      return true;
     }
     if (mode == MODE_SINGLE) {
       int16_t dx = x1 - lastX1;
@@ -3230,7 +3257,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
           lastY1 = y1;
           sendMouseButtons(MOUSE_BUTTON_LEFT);
           lastTouchTime = now;
-          return;
+          return true;
         }
         if (dist <= SINGLE_MOTION_START_DISTANCE) {
           velX = velY = 0;
@@ -3239,7 +3266,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
           lastX1 = x1;
           lastY1 = y1;
           lastTouchTime = now;
-          return;
+          return true;
         }
         tapCandidate = false;
       }
@@ -3256,7 +3283,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
         lastX1 = x1;
         lastY1 = y1;
         lastTouchTime = now;
-        return;
+        return true;
       }
 
       float fx = applySingleFingerAxisResponse(dx, AXIS_SCALE_X);
@@ -3287,7 +3314,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
     lastY1 = y1;
     mode = MODE_SINGLE;
     lastTouchTime = now;
-    return;
+    return true;
   }
 
   /*===== 抬起：处理单击 =====*/
@@ -3301,7 +3328,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       velX = velY = 0;
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
-      return;
+      return true;
     }
     if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
       tapCandidate = false;
@@ -3310,7 +3337,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
       velX = velY = 0;
       smoothDx = smoothDy = 0;
       accumX = accumY = 0;
-      return;
+      return true;
     }
     if (tapCandidate) {
       unsigned long dt = now - tapStartTime;
@@ -3320,28 +3347,28 @@ void handleReport(uint8_t* buf, uint16_t len) {
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
-          return;
+          return true;
         }
         if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
           performZoneAction(rightTopZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
-          return;
+          return true;
         }
         if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
           performZoneAction(rightBottomZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
-          return;
+          return true;
         }
         if (enableNavZones && inLeftBottomZone(tapStartX, tapStartY)) {
           performZoneAction(leftBottomZone);
           pendingClick = false;
           tapCandidate = false;
           mode = MODE_NONE;
-          return;
+          return true;
         }
         if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
           uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
@@ -3370,7 +3397,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
     velX = velY = 0;
     smoothDx = smoothDy = 0;
     accumX = accumY = 0;
-  }
+    return anyFinger || hadGestureState;
 }
 
 bool waitIntRelease(unsigned long timeoutUs) {
@@ -3410,8 +3437,9 @@ void readInputReport() {
   }
   for (uint16_t i = 0; i < len; i++) reportBuf[i] = Wire.read();
 
-  handleReport(reportBuf, len);
-  markActivity();
+  if (handleReport(reportBuf, len)) {
+    markActivity();
+  }
 
   waitIntRelease(INT_RELEASE_TIMEOUT_US);
 }
