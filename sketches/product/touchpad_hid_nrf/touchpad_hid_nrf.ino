@@ -302,6 +302,7 @@ unsigned long lastTouchTime = 0;
 unsigned long lastSwipeTime = 0;
 unsigned long lastFourSwipeTime = 0;
 unsigned long lastScrollTime = 0;
+unsigned long lastScrollMotionTime = 0;
 unsigned long lastActivityMs = 0;
 
 int16_t tripleStartX = 0;
@@ -428,6 +429,7 @@ void resetGestureState() {
   lastX2 = lastY2 = 0;
   lastTouchTime = now;
   lastScrollTime = now;
+  lastScrollMotionTime = 0;
 
   tripleStartX = tripleStartY = 0;
   tripleLastX = tripleLastY = 0;
@@ -764,6 +766,7 @@ void loop() {
     if (s) {
       sendMouseWheel(naturalScroll ? s : -s);
       accumScroll -= s;
+      lastScrollMotionTime = now;
     } else if (mode != MODE_DOUBLE && abs(accumScroll) < SCROLL_ACCUM_EPSILON) {
       accumScroll = 0;
     }
@@ -3365,6 +3368,9 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       v *= accel;
       smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
       scrollVel = smoothScroll;
+      if (abs(scrollVel) > SCROLL_VELOCITY_EPSILON) {
+        lastScrollMotionTime = now;
+      }
     } else {
       scrollVel = 0;
       smoothScroll = 0;
@@ -3386,7 +3392,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 单指移动 =====*/
   if (f1 && !f2) {
-    if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
+    if (now - lastScrollMotionTime < TAP_GUARD_AFTER_SCROLL_MS) {
       lastX1 = x1;
       lastY1 = y1;
       mode = MODE_SINGLE;
@@ -3486,7 +3492,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       accumX = accumY = 0;
       return true;
     }
-    if (now - lastScrollTime < TAP_GUARD_AFTER_SCROLL_MS) {
+    if (now - lastScrollMotionTime < TAP_GUARD_AFTER_SCROLL_MS) {
       tapCandidate = false;
       pendingClick = false;
       mode = MODE_NONE;
