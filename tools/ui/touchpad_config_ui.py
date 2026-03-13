@@ -166,6 +166,31 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.scroll_sensitivity.setSingleStep(0.000001)
         self.scroll_sensitivity.setRange(0.0, 1.0)
         scroll_group_layout.addRow("滚动灵敏度", self.scroll_sensitivity)
+        self.scroll_low_speed_boost_end = QtWidgets.QDoubleSpinBox()
+        self.scroll_low_speed_boost_end.setDecimals(3)
+        self.scroll_low_speed_boost_end.setSingleStep(0.01)
+        self.scroll_low_speed_boost_end.setRange(0.001, 2.0)
+        scroll_group_layout.addRow("低速扶正终点", self.scroll_low_speed_boost_end)
+        self.scroll_min_active_speed = QtWidgets.QDoubleSpinBox()
+        self.scroll_min_active_speed.setDecimals(3)
+        self.scroll_min_active_speed.setSingleStep(0.01)
+        self.scroll_min_active_speed.setRange(0.0, 2.0)
+        scroll_group_layout.addRow("最小滚动速度", self.scroll_min_active_speed)
+        self.scroll_accel_start_speed = QtWidgets.QDoubleSpinBox()
+        self.scroll_accel_start_speed.setDecimals(3)
+        self.scroll_accel_start_speed.setSingleStep(0.01)
+        self.scroll_accel_start_speed.setRange(0.0, 2.0)
+        scroll_group_layout.addRow("滚动加速起点", self.scroll_accel_start_speed)
+        self.scroll_accel_factor = QtWidgets.QDoubleSpinBox()
+        self.scroll_accel_factor.setDecimals(3)
+        self.scroll_accel_factor.setSingleStep(0.05)
+        self.scroll_accel_factor.setRange(0.0, 5.0)
+        scroll_group_layout.addRow("滚动加速系数", self.scroll_accel_factor)
+        self.scroll_max_accel = QtWidgets.QDoubleSpinBox()
+        self.scroll_max_accel.setDecimals(2)
+        self.scroll_max_accel.setSingleStep(0.1)
+        self.scroll_max_accel.setRange(1.0, 10.0)
+        scroll_group_layout.addRow("滚动最大加速", self.scroll_max_accel)
         scroll_layout.addWidget(scroll_group)
 
         single_group = QtWidgets.QGroupBox("单指")
@@ -209,27 +234,32 @@ class TouchpadConfigUI(QtWidgets.QWidget):
 
         power_group = QtWidgets.QGroupBox("蓝牙/省电")
         power_layout = QtWidgets.QFormLayout(power_group)
+        self.use_ble_when_usb = QtWidgets.QCheckBox("USB 连接时仍允许 BLE")
+        power_layout.addRow(self.use_ble_when_usb)
+        self.ble_idle_sleep_enabled = QtWidgets.QCheckBox("启用空闲省电")
+        power_layout.addRow(self.ble_idle_sleep_enabled)
         self.ble_idle_light_ms = QtWidgets.QSpinBox()
         self.ble_idle_light_ms.setRange(1000, 3600000)
         self.ble_idle_light_ms.setSingleStep(1000)
         self.ble_idle_light_ms.setSuffix(" ms")
         self.ble_idle_light_ms.setValue(60000)
-        self.ble_idle_light_ms.setEnabled(False)
         power_layout.addRow("第一阶段触发时长", self.ble_idle_light_ms)
         self.ble_idle_medium_ms = QtWidgets.QSpinBox()
         self.ble_idle_medium_ms.setRange(1000, 3600000)
         self.ble_idle_medium_ms.setSingleStep(1000)
         self.ble_idle_medium_ms.setSuffix(" ms")
         self.ble_idle_medium_ms.setValue(180000)
-        self.ble_idle_medium_ms.setEnabled(False)
         power_layout.addRow("第二阶段触发时长", self.ble_idle_medium_ms)
         self.ble_idle_sleep_ms = QtWidgets.QSpinBox()
         self.ble_idle_sleep_ms.setRange(1000, 3600000)
         self.ble_idle_sleep_ms.setSingleStep(1000)
         self.ble_idle_sleep_ms.setSuffix(" ms")
         self.ble_idle_sleep_ms.setValue(600000)
-        self.ble_idle_sleep_ms.setEnabled(False)
         power_layout.addRow("第三阶段触发时长", self.ble_idle_sleep_ms)
+        self.light_idle_rate = QtWidgets.QSpinBox()
+        self.light_idle_rate.setRange(5, 120)
+        self.light_idle_rate.setSuffix(" Hz")
+        power_layout.addRow("轻度空闲频率", self.light_idle_rate)
         scroll_layout.addWidget(power_group)
 
         zone_group = QtWidgets.QGroupBox("区域")
@@ -340,9 +370,6 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         self.save_btn.clicked.connect(self._save)
         self.load_btn.clicked.connect(self._load)
         self.reset_btn.clicked.connect(self._reset)
-        self.ble_idle_light_ms_supported = False
-        self.ble_idle_medium_ms_supported = False
-        self.ble_idle_sleep_ms_supported = False
 
     def _record_shortcut(self, widgets):
         dialog = QtWidgets.QDialog(self)
@@ -433,6 +460,16 @@ class TouchpadConfigUI(QtWidgets.QWidget):
         data = self.client.get_all()
         if "scrollSensitivity" in data:
             self.scroll_sensitivity.setValue(float(data["scrollSensitivity"]))
+        if "scrollLowSpeedBoostEnd" in data:
+            self.scroll_low_speed_boost_end.setValue(float(data["scrollLowSpeedBoostEnd"]))
+        if "scrollMinActiveSpeed" in data:
+            self.scroll_min_active_speed.setValue(float(data["scrollMinActiveSpeed"]))
+        if "scrollAccelStartSpeed" in data:
+            self.scroll_accel_start_speed.setValue(float(data["scrollAccelStartSpeed"]))
+        if "scrollAccelFactor" in data:
+            self.scroll_accel_factor.setValue(float(data["scrollAccelFactor"]))
+        if "scrollMaxAccel" in data:
+            self.scroll_max_accel.setValue(float(data["scrollMaxAccel"]))
         if "sensitivity" in data:
             self.sensitivity.setValue(float(data["sensitivity"]))
         if "smoothFactor" in data:
@@ -447,27 +484,18 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             self.move_deadband.setValue(int(data["moveDeadband"]))
         if "rate" in data:
             self.report_rate.setValue(int(data["rate"]))
+        if "useBleWhenUsb" in data:
+            self.use_ble_when_usb.setChecked(data["useBleWhenUsb"] == "1")
+        if "bleIdleSleepEnabled" in data:
+            self.ble_idle_sleep_enabled.setChecked(data["bleIdleSleepEnabled"] == "1")
         if "bleIdleLightMs" in data:
-            self.ble_idle_light_ms_supported = True
-            self.ble_idle_light_ms.setEnabled(True)
             self.ble_idle_light_ms.setValue(int(data["bleIdleLightMs"]))
-        else:
-            self.ble_idle_light_ms_supported = False
-            self.ble_idle_light_ms.setEnabled(False)
         if "bleIdleMediumMs" in data:
-            self.ble_idle_medium_ms_supported = True
-            self.ble_idle_medium_ms.setEnabled(True)
             self.ble_idle_medium_ms.setValue(int(data["bleIdleMediumMs"]))
-        else:
-            self.ble_idle_medium_ms_supported = False
-            self.ble_idle_medium_ms.setEnabled(False)
         if "bleIdleSleepMs" in data:
-            self.ble_idle_sleep_ms_supported = True
-            self.ble_idle_sleep_ms.setEnabled(True)
             self.ble_idle_sleep_ms.setValue(int(data["bleIdleSleepMs"]))
-        else:
-            self.ble_idle_sleep_ms_supported = False
-            self.ble_idle_sleep_ms.setEnabled(False)
+        if "lightIdleRate" in data:
+            self.light_idle_rate.setValue(int(data["lightIdleRate"]))
         if "topZonePercent" in data:
             self.top_percent.setValue(int(data["topZonePercent"]))
         if "sideZonePercent" in data:
@@ -575,13 +603,18 @@ class TouchpadConfigUI(QtWidgets.QWidget):
             f"SET sideZonePercent {self.side_percent.value()}",
             f"SET enableNavZones {1 if self.enable_zones.isChecked() else 0}",
             f"SET rate {self.report_rate.value()}",
+            f"SET scrollLowSpeedBoostEnd {self.scroll_low_speed_boost_end.value():.3f}",
+            f"SET scrollMinActiveSpeed {self.scroll_min_active_speed.value():.3f}",
+            f"SET scrollAccelStartSpeed {self.scroll_accel_start_speed.value():.3f}",
+            f"SET scrollAccelFactor {self.scroll_accel_factor.value():.3f}",
+            f"SET scrollMaxAccel {self.scroll_max_accel.value():.2f}",
+            f"SET useBleWhenUsb {1 if self.use_ble_when_usb.isChecked() else 0}",
+            f"SET bleIdleSleepEnabled {1 if self.ble_idle_sleep_enabled.isChecked() else 0}",
+            f"SET bleIdleLightMs {self.ble_idle_light_ms.value()}",
+            f"SET bleIdleMediumMs {self.ble_idle_medium_ms.value()}",
+            f"SET bleIdleSleepMs {self.ble_idle_sleep_ms.value()}",
+            f"SET lightIdleRate {self.light_idle_rate.value()}",
         ]
-        if self.ble_idle_light_ms_supported:
-            cmds.append(f"SET bleIdleLightMs {self.ble_idle_light_ms.value()}")
-        if self.ble_idle_medium_ms_supported:
-            cmds.append(f"SET bleIdleMediumMs {self.ble_idle_medium_ms.value()}")
-        if self.ble_idle_sleep_ms_supported:
-            cmds.append(f"SET bleIdleSleepMs {self.ble_idle_sleep_ms.value()}")
         cmds += self._zone_set_cmds("leftTop", self.left_top)
         cmds += self._zone_set_cmds("rightTop", self.right_top)
         cmds += self._zone_set_cmds("rightBottom", self.right_bottom)

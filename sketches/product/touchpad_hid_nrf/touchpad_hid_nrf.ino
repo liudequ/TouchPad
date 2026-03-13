@@ -249,11 +249,11 @@ float scrollSensitivity = 0.05f;
 float scrollSmoothFactor = 0.2f;
 bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
-const float SCROLL_LOW_SPEED_BOOST_END = 0.35f;
-const float SCROLL_MIN_ACTIVE_SPEED = 0.18f;
-const float SCROLL_ACCEL_START_SPEED = 0.45f;
-const float SCROLL_ACCEL_FACTOR = 0.90f;
-const float SCROLL_MAX_ACCEL = 2.50f;
+float scrollLowSpeedBoostEnd = 0.35f;
+float scrollMinActiveSpeed = 0.18f;
+float scrollAccelStartSpeed = 0.45f;
+float scrollAccelFactor = 0.90f;
+float scrollMaxAccel = 2.50f;
 const uint32_t SCROLL_REPORT_INTERVAL_MS = 8;
 const float SCROLL_RELEASE_DECAY = 0.72f;
 const float SCROLL_VELOCITY_EPSILON = 0.02f;
@@ -377,20 +377,20 @@ float applyScrollAxisResponse(int16_t delta) {
   if (magnitude <= 0.0f) return 0.0f;
 
   float response = magnitude;
-  if (magnitude < SCROLL_LOW_SPEED_BOOST_END) {
-    float t = magnitude / SCROLL_LOW_SPEED_BOOST_END;
-    response = SCROLL_MIN_ACTIVE_SPEED + (magnitude - SCROLL_MIN_ACTIVE_SPEED) * t;
+  if (magnitude < scrollLowSpeedBoostEnd) {
+    float t = magnitude / scrollLowSpeedBoostEnd;
+    response = scrollMinActiveSpeed + (magnitude - scrollMinActiveSpeed) * t;
   }
 
   return scaled < 0.0f ? -response : response;
 }
 
 float scrollAccelForSpeed(float speed) {
-  float totalMaxAccel = max(1.0f, SCROLL_MAX_ACCEL);
-  if (speed <= SCROLL_ACCEL_START_SPEED) return 1.0f;
+  float totalMaxAccel = max(1.0f, scrollMaxAccel);
+  if (speed <= scrollAccelStartSpeed) return 1.0f;
 
-  float extraSpeed = speed - SCROLL_ACCEL_START_SPEED;
-  float extraAccel = min(extraSpeed * SCROLL_ACCEL_FACTOR, totalMaxAccel - 1.0f);
+  float extraSpeed = speed - scrollAccelStartSpeed;
+  float extraAccel = min(extraSpeed * scrollAccelFactor, totalMaxAccel - 1.0f);
   return 1.0f + extraAccel;
 }
 
@@ -473,6 +473,11 @@ void applyDefaults() {
   maxDelta = 60;
   moveDeadband = 1;
   scrollSensitivity = 0.05f;
+  scrollLowSpeedBoostEnd = 0.35f;
+  scrollMinActiveSpeed = 0.18f;
+  scrollAccelStartSpeed = 0.45f;
+  scrollAccelFactor = 0.90f;
+  scrollMaxAccel = 2.50f;
   TOP_ZONE_PERCENT = 20;
   SIDE_ZONE_PERCENT = 35;
   enableNavZones = true;
@@ -822,6 +827,11 @@ void processCommand(const String& line) {
     cfgOut->println("CMD: GET bleIdleMediumMs");
     cfgOut->println("CMD: GET bleIdleSleepMs");
     cfgOut->println("CMD: GET lightIdleRate");
+    cfgOut->println("CMD: GET scrollLowSpeedBoostEnd");
+    cfgOut->println("CMD: GET scrollMinActiveSpeed");
+    cfgOut->println("CMD: GET scrollAccelStartSpeed");
+    cfgOut->println("CMD: GET scrollAccelFactor");
+    cfgOut->println("CMD: GET scrollMaxAccel");
     cfgOut->println("CMD: GET battery");
     return;
   }
@@ -853,6 +863,16 @@ void processCommand(const String& line) {
     cfgOut->println(reportIntervalMs ? (1000 / reportIntervalMs) : 0);
     cfgOut->print("scrollSensitivity=");
     cfgOut->println(scrollSensitivity, 8);
+    cfgOut->print("scrollLowSpeedBoostEnd=");
+    cfgOut->println(scrollLowSpeedBoostEnd, 6);
+    cfgOut->print("scrollMinActiveSpeed=");
+    cfgOut->println(scrollMinActiveSpeed, 6);
+    cfgOut->print("scrollAccelStartSpeed=");
+    cfgOut->println(scrollAccelStartSpeed, 6);
+    cfgOut->print("scrollAccelFactor=");
+    cfgOut->println(scrollAccelFactor, 6);
+    cfgOut->print("scrollMaxAccel=");
+    cfgOut->println(scrollMaxAccel, 6);
     cfgOut->print("topZonePercent=");
     cfgOut->println(TOP_ZONE_PERCENT);
     cfgOut->print("sideZonePercent=");
@@ -1032,6 +1052,31 @@ void processCommand(const String& line) {
     if (key.equalsIgnoreCase("scrollSensitivity")) {
       cfgOut->print("scrollSensitivity=");
       cfgOut->println(scrollSensitivity, 8);
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollLowSpeedBoostEnd")) {
+      cfgOut->print("scrollLowSpeedBoostEnd=");
+      cfgOut->println(scrollLowSpeedBoostEnd, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollMinActiveSpeed")) {
+      cfgOut->print("scrollMinActiveSpeed=");
+      cfgOut->println(scrollMinActiveSpeed, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollAccelStartSpeed")) {
+      cfgOut->print("scrollAccelStartSpeed=");
+      cfgOut->println(scrollAccelStartSpeed, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollAccelFactor")) {
+      cfgOut->print("scrollAccelFactor=");
+      cfgOut->println(scrollAccelFactor, 6);
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollMaxAccel")) {
+      cfgOut->print("scrollMaxAccel=");
+      cfgOut->println(scrollMaxAccel, 6);
       return;
     }
     if (key.equalsIgnoreCase("sensitivity")) {
@@ -1509,6 +1554,56 @@ void processCommand(const String& line) {
       float v = valueStr.toFloat();
       if (v > 0.0f) {
         scrollSensitivity = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollLowSpeedBoostEnd")) {
+      float v = valueStr.toFloat();
+      if (v > 0.0f && v <= 2.0f) {
+        scrollLowSpeedBoostEnd = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollMinActiveSpeed")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 2.0f) {
+        scrollMinActiveSpeed = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollAccelStartSpeed")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 2.0f) {
+        scrollAccelStartSpeed = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollAccelFactor")) {
+      float v = valueStr.toFloat();
+      if (v >= 0.0f && v <= 5.0f) {
+        scrollAccelFactor = v;
+        cfgOut->println("OK");
+      } else {
+        cfgOut->println("ERR: value");
+      }
+      return;
+    }
+    if (key.equalsIgnoreCase("scrollMaxAccel")) {
+      float v = valueStr.toFloat();
+      if (v >= 1.0f && v <= 10.0f) {
+        scrollMaxAccel = v;
         cfgOut->println("OK");
       } else {
         cfgOut->println("ERR: value");
@@ -2531,6 +2626,21 @@ bool loadConfig() {
     if (key.equalsIgnoreCase("scrollSensitivity")) {
       float val = value.toFloat();
       if (val > 0.0f) scrollSensitivity = val;
+    } else if (key.equalsIgnoreCase("scrollLowSpeedBoostEnd")) {
+      float val = value.toFloat();
+      if (val > 0.0f && val <= 2.0f) scrollLowSpeedBoostEnd = val;
+    } else if (key.equalsIgnoreCase("scrollMinActiveSpeed")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 2.0f) scrollMinActiveSpeed = val;
+    } else if (key.equalsIgnoreCase("scrollAccelStartSpeed")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 2.0f) scrollAccelStartSpeed = val;
+    } else if (key.equalsIgnoreCase("scrollAccelFactor")) {
+      float val = value.toFloat();
+      if (val >= 0.0f && val <= 5.0f) scrollAccelFactor = val;
+    } else if (key.equalsIgnoreCase("scrollMaxAccel")) {
+      float val = value.toFloat();
+      if (val >= 1.0f && val <= 10.0f) scrollMaxAccel = val;
     } else if (key.equalsIgnoreCase("sensitivity")) {
       float val = value.toFloat();
       if (val > 0.0f) sensitivity = val;
@@ -2818,6 +2928,16 @@ bool saveConfig() {
   }
   f.print("scrollSensitivity=");
   f.println(scrollSensitivity, 8);
+  f.print("scrollLowSpeedBoostEnd=");
+  f.println(scrollLowSpeedBoostEnd, 6);
+  f.print("scrollMinActiveSpeed=");
+  f.println(scrollMinActiveSpeed, 6);
+  f.print("scrollAccelStartSpeed=");
+  f.println(scrollAccelStartSpeed, 6);
+  f.print("scrollAccelFactor=");
+  f.println(scrollAccelFactor, 6);
+  f.print("scrollMaxAccel=");
+  f.println(scrollMaxAccel, 6);
   f.print("sensitivity=");
   f.println(sensitivity, 6);
   f.print("smoothFactor=");
