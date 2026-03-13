@@ -152,6 +152,8 @@ void sendMouseClick(uint8_t buttons);
 void sendKeyboard(uint8_t modifier, uint8_t keycode);
 float applySingleFingerAxisResponse(int16_t delta, float axisScale);
 float singleFingerAccelForSpeed(float speed);
+float applyScrollAxisResponse(int16_t delta);
+float scrollAccelForSpeed(float speed);
 bool handleReport(uint8_t* buf, uint16_t len);
 bool waitIntRelease(unsigned long timeoutUs);
 void readInputReport();
@@ -247,6 +249,11 @@ float scrollSensitivity = 0.05f;
 float scrollSmoothFactor = 0.2f;
 bool naturalScroll = true;
 const int16_t SCROLL_DEADBAND = 0;
+const float SCROLL_LOW_SPEED_BOOST_END = 0.35f;
+const float SCROLL_MIN_ACTIVE_SPEED = 0.18f;
+const float SCROLL_ACCEL_START_SPEED = 0.45f;
+const float SCROLL_ACCEL_FACTOR = 0.90f;
+const float SCROLL_MAX_ACCEL = 2.50f;
 const uint32_t SCROLL_REPORT_INTERVAL_MS = 8;
 const float SCROLL_RELEASE_DECAY = 0.72f;
 const float SCROLL_VELOCITY_EPSILON = 0.02f;
@@ -361,6 +368,29 @@ float singleFingerAccelForSpeed(float speed) {
 
   float extraSpeed = speed - SINGLE_ACCEL_START_SPEED;
   float extraAccel = min(extraSpeed * accelFactor, totalMaxAccel - 1.0f);
+  return 1.0f + extraAccel;
+}
+
+float applyScrollAxisResponse(int16_t delta) {
+  float scaled = delta * scrollSensitivity;
+  float magnitude = abs(scaled);
+  if (magnitude <= 0.0f) return 0.0f;
+
+  float response = magnitude;
+  if (magnitude < SCROLL_LOW_SPEED_BOOST_END) {
+    float t = magnitude / SCROLL_LOW_SPEED_BOOST_END;
+    response = SCROLL_MIN_ACTIVE_SPEED + (magnitude - SCROLL_MIN_ACTIVE_SPEED) * t;
+  }
+
+  return scaled < 0.0f ? -response : response;
+}
+
+float scrollAccelForSpeed(float speed) {
+  float totalMaxAccel = max(1.0f, SCROLL_MAX_ACCEL);
+  if (speed <= SCROLL_ACCEL_START_SPEED) return 1.0f;
+
+  float extraSpeed = speed - SCROLL_ACCEL_START_SPEED;
+  float extraAccel = min(extraSpeed * SCROLL_ACCEL_FACTOR, totalMaxAccel - 1.0f);
   return 1.0f + extraAccel;
 }
 
@@ -3210,7 +3240,9 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       int16_t dy = ((y1 - lastY1) + (y2 - lastY2)) / 2;
       dy = constrain(dy, -maxDelta, maxDelta);
       if (abs(dy) <= SCROLL_DEADBAND) dy = 0;
-      float v = dy * scrollSensitivity;
+      float v = applyScrollAxisResponse(dy);
+      float accel = scrollAccelForSpeed(abs(v));
+      v *= accel;
       smoothScroll += (v - smoothScroll) * scrollSmoothFactor;
       scrollVel = smoothScroll;
     } else {
