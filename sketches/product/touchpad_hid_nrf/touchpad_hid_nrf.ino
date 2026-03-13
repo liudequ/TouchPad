@@ -150,7 +150,11 @@ void sendMouseWheel(int8_t wheel);
 void sendMouseButtons(uint8_t buttons);
 void sendMouseClick(uint8_t buttons);
 void sendKeyboard(uint8_t modifier, uint8_t keycode);
+float applySingleFingerAxisResponse(int16_t delta, float axisScale);
+float singleFingerAccelForSpeed(float speed);
 bool handleReport(uint8_t* buf, uint16_t len);
+bool waitIntRelease(unsigned long timeoutUs);
+void readInputReport();
 
 void writeStatusLed(bool on) {
   if (ledStateOn == on) return;
@@ -220,33 +224,6 @@ void idleCpuUntilEvent() {
 #else
   delay(1);
 #endif
-}
-
-float applySingleFingerAxisResponse(int16_t delta, float axisScale) {
-  float scaled = delta * sensitivity * axisScale;
-  float magnitude = abs(scaled);
-  if (magnitude <= 0.0f) return 0.0f;
-
-  float softDeadband = moveDeadband * sensitivity * axisScale;
-  float response = magnitude;
-  if (softDeadband > 0.0f) {
-    if (magnitude <= softDeadband) {
-      response = magnitude * SINGLE_SOFT_DEADBAND_BLEND;
-    } else {
-      response = (softDeadband * SINGLE_SOFT_DEADBAND_BLEND) + (magnitude - softDeadband);
-    }
-  }
-
-  return scaled < 0.0f ? -response : response;
-}
-
-float singleFingerAccelForSpeed(float speed) {
-  float totalMaxAccel = max(1.0f, maxAccel);
-  if (speed <= SINGLE_ACCEL_START_SPEED) return 1.0f;
-
-  float extraSpeed = speed - SINGLE_ACCEL_START_SPEED;
-  float extraAccel = min(extraSpeed * accelFactor, totalMaxAccel - 1.0f);
-  return 1.0f + extraAccel;
 }
 
 void rebootDevice() {
@@ -359,6 +336,33 @@ bool pendingClick = false;
 unsigned long lastTapTime = 0;
 int16_t lastTapX = 0;
 int16_t lastTapY = 0;
+
+float applySingleFingerAxisResponse(int16_t delta, float axisScale) {
+  float scaled = delta * sensitivity * axisScale;
+  float magnitude = abs(scaled);
+  if (magnitude <= 0.0f) return 0.0f;
+
+  float softDeadband = moveDeadband * sensitivity * axisScale;
+  float response = magnitude;
+  if (softDeadband > 0.0f) {
+    if (magnitude <= softDeadband) {
+      response = magnitude * SINGLE_SOFT_DEADBAND_BLEND;
+    } else {
+      response = (softDeadband * SINGLE_SOFT_DEADBAND_BLEND) + (magnitude - softDeadband);
+    }
+  }
+
+  return scaled < 0.0f ? -response : response;
+}
+
+float singleFingerAccelForSpeed(float speed) {
+  float totalMaxAccel = max(1.0f, maxAccel);
+  if (speed <= SINGLE_ACCEL_START_SPEED) return 1.0f;
+
+  float extraSpeed = speed - SINGLE_ACCEL_START_SPEED;
+  float extraAccel = min(extraSpeed * accelFactor, totalMaxAccel - 1.0f);
+  return 1.0f + extraAccel;
+}
 
 // 触摸板区域（基于实测坐标范围）
 const int16_t TOUCH_MAX_X = 2628;
@@ -3398,6 +3402,9 @@ bool handleReport(uint8_t* buf, uint16_t len) {
     smoothDx = smoothDy = 0;
     accumX = accumY = 0;
     return anyFinger || hadGestureState;
+  }
+
+  return anyFinger || hadGestureState;
 }
 
 bool waitIntRelease(unsigned long timeoutUs) {
