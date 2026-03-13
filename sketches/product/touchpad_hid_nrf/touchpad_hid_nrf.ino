@@ -150,6 +150,7 @@ void sendMouseWheel(int8_t wheel);
 void sendMouseButtons(uint8_t buttons);
 void sendMouseClick(uint8_t buttons);
 void sendKeyboard(uint8_t modifier, uint8_t keycode);
+bool finalizeSingleTouch(unsigned long now, bool releasedByTimeout);
 float applySingleFingerAxisResponse(int16_t delta, float axisScale);
 float singleFingerAccelForSpeed(float speed);
 float applyScrollAxisResponse(int16_t delta);
@@ -690,13 +691,7 @@ void loop() {
 
   /*单指超时释放*/
   if (mode == MODE_SINGLE && now - lastTouchTime > RELEASE_TIMEOUT) {
-    mode = MODE_NONE;
-    velX = velY = 0;
-    smoothDx = smoothDy = 0;
-    accumX = accumY = 0;
-    tapCandidate = false;
-    if (dragActive) sendMouseButtons((uint8_t)0);
-    dragActive = false;
+    finalizeSingleTouch(now, true);
   }
 
   /*双指超时释放*/
@@ -775,6 +770,14 @@ void loop() {
   if (pendingClick && now - lastTapTime > DOUBLE_TAP_WINDOW) {
     sendMouseClick(MOUSE_BUTTON_LEFT);
     pendingClick = false;
+  }
+  if (pendingThreeTap && now - lastThreeTapTime > DOUBLE_TAP_WINDOW) {
+    performZoneAction(threeTapBinding);
+    pendingThreeTap = false;
+  }
+  if (pendingFourTap && now - lastFourTapTime > DOUBLE_TAP_WINDOW) {
+    performZoneAction(fourTapBinding);
+    pendingFourTap = false;
   }
 
   if (!inputHandled &&
@@ -3185,12 +3188,79 @@ void performTapBinding(bool* pendingTap,
       *pendingTap = false;
       return;
     }
+    performZoneAction(singleTapBinding);
   }
-  performZoneAction(singleTapBinding);
   *pendingTap = true;
   *lastTapTimeMs = now;
   *lastTapPosX = tapX;
   *lastTapPosY = tapY;
+}
+
+bool finalizeSingleTouch(unsigned long now, bool releasedByTimeout) {
+  if (dragActive) {
+    sendMouseButtons((uint8_t)0);
+    dragActive = false;
+    tapCandidate = false;
+    pendingClick = false;
+    mode = MODE_NONE;
+    velX = velY = 0;
+    smoothDx = smoothDy = 0;
+    accumX = accumY = 0;
+    return true;
+  }
+  if (now - lastScrollMotionTime < TAP_GUARD_AFTER_SCROLL_MS) {
+    tapCandidate = false;
+    pendingClick = false;
+    mode = MODE_NONE;
+    velX = velY = 0;
+    smoothDx = smoothDy = 0;
+    accumX = accumY = 0;
+    return true;
+  }
+  if (tapCandidate) {
+    unsigned long dt = now - tapStartTime;
+    if (dt <= TAP_MAX_MS) {
+      if (enableNavZones && inLeftTopZone(tapStartX, tapStartY)) {
+        performZoneAction(leftTopZone);
+      } else if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
+        performZoneAction(rightTopZone);
+      } else if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
+        performZoneAction(rightBottomZone);
+      } else if (enableNavZones && inLeftBottomZone(tapStartX, tapStartY)) {
+        performZoneAction(leftBottomZone);
+      } else if (!releasedByTimeout && pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
+        uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
+        if (dist <= DOUBLE_TAP_MAX_MOVE) {
+          sendMouseClick(MOUSE_BUTTON_LEFT);
+          delay(30);
+          sendMouseClick(MOUSE_BUTTON_LEFT);
+          pendingClick = false;
+        } else {
+          sendMouseClick(MOUSE_BUTTON_LEFT);
+          pendingClick = true;
+          lastTapTime = now;
+          lastTapX = tapStartX;
+          lastTapY = tapStartY;
+        }
+      } else {
+        if (releasedByTimeout && pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
+          sendMouseClick(MOUSE_BUTTON_LEFT);
+          pendingClick = false;
+        } else {
+          pendingClick = true;
+          lastTapTime = now;
+          lastTapX = tapStartX;
+          lastTapY = tapStartY;
+        }
+      }
+    }
+  }
+  tapCandidate = false;
+  mode = MODE_NONE;
+  velX = velY = 0;
+  smoothDx = smoothDy = 0;
+  accumX = accumY = 0;
+  return true;
 }
 
 #include "modules/touchpad_hid_output.h"
@@ -3481,84 +3551,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
-    if (dragActive) {
-      sendMouseButtons((uint8_t)0);
-      dragActive = false;
-      tapCandidate = false;
-      pendingClick = false;
-      mode = MODE_NONE;
-      velX = velY = 0;
-      smoothDx = smoothDy = 0;
-      accumX = accumY = 0;
-      return true;
-    }
-    if (now - lastScrollMotionTime < TAP_GUARD_AFTER_SCROLL_MS) {
-      tapCandidate = false;
-      pendingClick = false;
-      mode = MODE_NONE;
-      velX = velY = 0;
-      smoothDx = smoothDy = 0;
-      accumX = accumY = 0;
-      return true;
-    }
-    if (tapCandidate) {
-      unsigned long dt = now - tapStartTime;
-      if (dt <= TAP_MAX_MS) {
-        if (enableNavZones && inLeftTopZone(tapStartX, tapStartY)) {
-          performZoneAction(leftTopZone);
-          pendingClick = false;
-          tapCandidate = false;
-          mode = MODE_NONE;
-          return true;
-        }
-        if (enableNavZones && inRightTopZone(tapStartX, tapStartY)) {
-          performZoneAction(rightTopZone);
-          pendingClick = false;
-          tapCandidate = false;
-          mode = MODE_NONE;
-          return true;
-        }
-        if (enableNavZones && inRightBottomZone(tapStartX, tapStartY)) {
-          performZoneAction(rightBottomZone);
-          pendingClick = false;
-          tapCandidate = false;
-          mode = MODE_NONE;
-          return true;
-        }
-        if (enableNavZones && inLeftBottomZone(tapStartX, tapStartY)) {
-          performZoneAction(leftBottomZone);
-          pendingClick = false;
-          tapCandidate = false;
-          mode = MODE_NONE;
-          return true;
-        }
-        if (pendingClick && now - lastTapTime <= DOUBLE_TAP_WINDOW) {
-          uint16_t dist = abs(tapStartX - lastTapX) + abs(tapStartY - lastTapY);
-          if (dist <= DOUBLE_TAP_MAX_MOVE) {
-            sendMouseClick(MOUSE_BUTTON_LEFT);
-            delay(30);
-            sendMouseClick(MOUSE_BUTTON_LEFT);
-            pendingClick = false;
-          } else {
-            sendMouseClick(MOUSE_BUTTON_LEFT);
-            pendingClick = true;
-            lastTapTime = now;
-            lastTapX = tapStartX;
-            lastTapY = tapStartY;
-          }
-        } else {
-          pendingClick = true;
-          lastTapTime = now;
-          lastTapX = tapStartX;
-          lastTapY = tapStartY;
-        }
-      }
-    }
-    tapCandidate = false;
-    mode = MODE_NONE;
-    velX = velY = 0;
-    smoothDx = smoothDy = 0;
-    accumX = accumY = 0;
+    finalizeSingleTouch(now, false);
     return anyFinger || hadGestureState;
   }
 
