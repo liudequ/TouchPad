@@ -266,7 +266,6 @@ const unsigned long TAP_MAX_MS = 200;
 const unsigned long LONG_PRESS_DRAG_MS = 220;
 const unsigned long DOUBLE_TAP_WINDOW = 200;
 const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
-const uint16_t SINGLE_MOTION_START_DISTANCE = 8;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
@@ -3491,7 +3490,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
           lastTouchTime = now;
           return true;
         }
-        if (dist <= SINGLE_MOTION_START_DISTANCE) {
+        if (dist <= DOUBLE_TAP_MAX_MOVE) {
           velX = velY = 0;
           smoothDx = smoothDy = 0;
           accumX = accumY = 0;
