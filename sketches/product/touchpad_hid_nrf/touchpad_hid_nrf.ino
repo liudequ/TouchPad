@@ -210,6 +210,33 @@ void updateStatusLed(unsigned long now) {
   }
 }
 
+float applySingleFingerAxisResponse(int16_t delta, float axisScale) {
+  float scaled = delta * sensitivity * axisScale;
+  float magnitude = abs(scaled);
+  if (magnitude <= 0.0f) return 0.0f;
+
+  float softDeadband = moveDeadband * sensitivity * axisScale;
+  float response = magnitude;
+  if (softDeadband > 0.0f) {
+    if (magnitude <= softDeadband) {
+      response = magnitude * SINGLE_SOFT_DEADBAND_BLEND;
+    } else {
+      response = (softDeadband * SINGLE_SOFT_DEADBAND_BLEND) + (magnitude - softDeadband);
+    }
+  }
+
+  return scaled < 0.0f ? -response : response;
+}
+
+float singleFingerAccelForSpeed(float speed) {
+  float totalMaxAccel = max(1.0f, maxAccel);
+  if (speed <= SINGLE_ACCEL_START_SPEED) return 1.0f;
+
+  float extraSpeed = speed - SINGLE_ACCEL_START_SPEED;
+  float extraAccel = min(extraSpeed * accelFactor, totalMaxAccel - 1.0f);
+  return 1.0f + extraAccel;
+}
+
 void rebootDevice() {
 #if defined(ARDUINO_ARCH_NRF52)
   delay(20);
@@ -242,10 +269,15 @@ const unsigned long TAP_MAX_MS = 200;
 const unsigned long LONG_PRESS_DRAG_MS = 220;
 const unsigned long DOUBLE_TAP_WINDOW = 200;
 const uint16_t DOUBLE_TAP_MAX_MOVE = 80;
+const uint16_t SINGLE_MOTION_START_DISTANCE = 8;
 const unsigned long RELEASE_TIMEOUT = 30;
 const unsigned long INT_RELEASE_TIMEOUT_US = 5000;
 const unsigned long TAP_GUARD_AFTER_SCROLL_MS = 150;
 uint32_t reportIntervalMs = 16;
+const float SINGLE_SOFT_DEADBAND_BLEND = 0.35f;
+const float SINGLE_ACCEL_START_SPEED = 0.6f;
+const float SINGLE_HOLD_DECAY = 0.65f;
+const float SINGLE_VELOCITY_EPSILON = 0.01f;
 
 // 三指滑动
 uint16_t threeSwipeThresholdX = 200;
@@ -3183,8 +3215,6 @@ void handleReport(uint8_t* buf, uint16_t len) {
       int16_t dy = y1 - lastY1;
       dx = constrain(dx, -maxDelta, maxDelta);
       dy = constrain(dy, -maxDelta, maxDelta);
-      if (abs(dx) <= moveDeadband) dx = 0;
-      if (abs(dy) <= moveDeadband) dy = 0;
 
       if (tapCandidate) {
         uint16_t dist = abs(x1 - tapStartX) + abs(y1 - tapStartY);
@@ -3202,7 +3232,7 @@ void handleReport(uint8_t* buf, uint16_t len) {
           lastTouchTime = now;
           return;
         }
-        if (dist <= DOUBLE_TAP_MAX_MOVE) {
+        if (dist <= SINGLE_MOTION_START_DISTANCE) {
           velX = velY = 0;
           smoothDx = smoothDy = 0;
           accumX = accumY = 0;
@@ -3215,18 +3245,25 @@ void handleReport(uint8_t* buf, uint16_t len) {
       }
 
       if (dx == 0 && dy == 0) {
-        velX = velY = 0;
-        smoothDx = smoothDy = 0;
-        accumX = accumY = 0;
+        smoothDx *= SINGLE_HOLD_DECAY;
+        smoothDy *= SINGLE_HOLD_DECAY;
+        if (abs(smoothDx) < SINGLE_VELOCITY_EPSILON) smoothDx = 0;
+        if (abs(smoothDy) < SINGLE_VELOCITY_EPSILON) smoothDy = 0;
+        velX = smoothDx;
+        velY = smoothDy;
+        if (abs(accumX) < SINGLE_VELOCITY_EPSILON) accumX = 0;
+        if (abs(accumY) < SINGLE_VELOCITY_EPSILON) accumY = 0;
+        lastX1 = x1;
+        lastY1 = y1;
         lastTouchTime = now;
         return;
       }
 
-      float fx = dx * sensitivity * AXIS_SCALE_X;
-      float fy = dy * sensitivity * AXIS_SCALE_Y;
+      float fx = applySingleFingerAxisResponse(dx, AXIS_SCALE_X);
+      float fy = applySingleFingerAxisResponse(dy, AXIS_SCALE_Y);
 
       float speed = sqrt(fx * fx + fy * fy);
-      float accel = 1.0f + min(speed * accelFactor, maxAccel);
+      float accel = singleFingerAccelForSpeed(speed);
       fx *= accel;
       fy *= accel;
 
