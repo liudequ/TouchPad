@@ -139,7 +139,6 @@ void enterIdleLightStage();
 void enterIdleMediumStage();
 void handleIdlePower(unsigned long now);
 void markActivity();
-void idleCpuUntilEvent();
 uint16_t readBatteryMilliVolts();
 uint8_t batteryPercentFromMilliVolts(uint16_t mv);
 void refreshBatteryStatus(bool forceNotify);
@@ -155,7 +154,7 @@ float applySingleFingerAxisResponse(int16_t delta, float axisScale);
 float singleFingerAccelForSpeed(float speed);
 float applyScrollAxisResponse(int16_t delta);
 float scrollAccelForSpeed(float speed);
-bool handleReport(uint8_t* buf, uint16_t len);
+void handleReport(uint8_t* buf, uint16_t len);
 bool waitIntRelease(unsigned long timeoutUs);
 void readInputReport();
 
@@ -217,16 +216,6 @@ void updateStatusLed(unsigned long now) {
       writeStatusLed(false);
       break;
   }
-}
-
-void idleCpuUntilEvent() {
-#if defined(ARDUINO_ARCH_NRF52)
-  __SEV();
-  __WFE();
-  __WFE();
-#else
-  delay(1);
-#endif
 }
 
 void rebootDevice() {
@@ -676,10 +665,8 @@ void loop() {
   handleSerial();
   updateTransport();
   updateConnectionState();
-  bool inputHandled = false;
   if (digitalRead(INT_PIN) == LOW) {
     readInputReport();
-    inputHandled = true;
   }
   unsigned long now = millis();
   handleBattery(now);
@@ -777,17 +764,6 @@ void loop() {
   if (pendingFourTap && now - lastFourTapTime > DOUBLE_TAP_WINDOW) {
     performZoneAction(fourTapBinding);
     pendingFourTap = false;
-  }
-
-  if (!inputHandled &&
-      digitalRead(INT_PIN) != LOW &&
-      mode == MODE_NONE &&
-      !scrollActive &&
-      !dragActive &&
-      !pendingClick &&
-      !pendingThreeTap &&
-      !pendingFourTap) {
-    idleCpuUntilEvent();
   }
 }
 
@@ -3267,8 +3243,8 @@ bool finalizeSingleTouch(unsigned long now, bool releasedByTimeout) {
 /* ===========================
    Report 解析
    =========================== */
-bool handleReport(uint8_t* buf, uint16_t len) {
-  if (len < 13) return false;
+void handleReport(uint8_t* buf, uint16_t len) {
+  if (len < 13) return;
   uint8_t s0 = buf[3];
   uint8_t s1 = buf[8];
   uint8_t s2 = (len >= 18) ? buf[13] : 0;
@@ -3279,16 +3255,14 @@ bool handleReport(uint8_t* buf, uint16_t len) {
   bool f3 = (len >= 18) ? (s2 & 0x02) : false;
   bool f4 = (len >= 23) ? (s3 & 0x02) : false;
   bool anyFinger = f1 || f2 || f3 || f4;
-  bool hadGestureState = (mode != MODE_NONE) || tapCandidate || dragActive || pendingClick ||
-                         pendingThreeTap || pendingFourTap;
 
   if (waitFingerReleaseAfterReconnect) {
     if (anyFinger) {
       lastTouchTime = millis();
-      return false;
+      return;
     }
     waitFingerReleaseAfterReconnect = false;
-    return false;
+    return;
   }
 
   int16_t x1 = buf[4] | (buf[5] << 8);
@@ -3323,7 +3297,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
     mode = MODE_QUAD;
     tapCandidate = false;
     lastTouchTime = now;
-    return true;
+    return;
   }
 
   if (mode == MODE_QUAD && !(f1 && f2 && f3 && f4)) {
@@ -3361,7 +3335,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       tapCandidate = false;
     }
     mode = MODE_NONE;
-    return true;
+    return;
   }
 
   /*===== 三指手势 =====*/
@@ -3381,7 +3355,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
     mode = MODE_TRIPLE;
     tapCandidate = false;
     lastTouchTime = now;
-    return true;
+    return;
   }
 
   if (mode == MODE_TRIPLE && !(f1 && f2 && f3)) {
@@ -3419,7 +3393,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       tapCandidate = false;
     }
     mode = MODE_NONE;
-    return true;
+    return;
   }
 
   /*===== 双指滚动 =====*/
@@ -3456,7 +3430,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
     tapCandidate = false;
     lastTouchTime = now;
     lastScrollTime = now;
-    return true;
+    return;
   }
 
   /*===== 单指移动 =====*/
@@ -3466,7 +3440,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
       lastY1 = y1;
       mode = MODE_SINGLE;
       lastTouchTime = now;
-      return true;
+      return;
     }
     if (mode == MODE_SINGLE) {
       int16_t dx = x1 - lastX1;
@@ -3488,7 +3462,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
           lastY1 = y1;
           sendMouseButtons(MOUSE_BUTTON_LEFT);
           lastTouchTime = now;
-          return true;
+          return;
         }
         if (dist <= DOUBLE_TAP_MAX_MOVE) {
           velX = velY = 0;
@@ -3497,7 +3471,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
           lastX1 = x1;
           lastY1 = y1;
           lastTouchTime = now;
-          return true;
+          return;
         }
         tapCandidate = false;
       }
@@ -3514,7 +3488,7 @@ bool handleReport(uint8_t* buf, uint16_t len) {
         lastX1 = x1;
         lastY1 = y1;
         lastTouchTime = now;
-        return true;
+        return;
       }
 
       float fx = applySingleFingerAxisResponse(dx, AXIS_SCALE_X);
@@ -3545,16 +3519,14 @@ bool handleReport(uint8_t* buf, uint16_t len) {
     lastY1 = y1;
     mode = MODE_SINGLE;
     lastTouchTime = now;
-    return true;
+    return;
   }
 
   /*===== 抬起：处理单击 =====*/
   if (!f1 && mode == MODE_SINGLE) {
     finalizeSingleTouch(now, false);
-    return anyFinger || hadGestureState;
+    return;
   }
-
-  return anyFinger || hadGestureState;
 }
 
 bool waitIntRelease(unsigned long timeoutUs) {
@@ -3594,9 +3566,8 @@ void readInputReport() {
   }
   for (uint16_t i = 0; i < len; i++) reportBuf[i] = Wire.read();
 
-  if (handleReport(reportBuf, len)) {
-    markActivity();
-  }
+  handleReport(reportBuf, len);
+  markActivity();
 
   waitIntRelease(INT_RELEASE_TIMEOUT_US);
 }
