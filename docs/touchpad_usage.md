@@ -3,10 +3,12 @@
 本项目将触摸板输入转换为 HID 输入设备输出，支持 USB 与 BLE。
 
 ## 硬件连接（nice!nano v2 / SuperMini nRF52840）
+- 触摸板供电：`VCC=3V3`、`GND=GND`
 - 触摸板 I2C：`SDA=D9`、`SCL=D8`
 - 中断引脚：`INT=D7`（上拉输入）
 - 使能引脚：`TP_EN=D6`
 - 设备 I2C 地址：`0x2C`
+- 若通过 FPC 转接板接线，当前针脚顺序按镜像后的实际定义，详见 `docs/fpc_pinout.md`。
 
 如需修改引脚或地址，编辑 `sketches/product/touchpad_hid_nrf/touchpad_hid_nrf.ino` 顶部宏定义。
 物料清单见 `docs/bom.md`。
