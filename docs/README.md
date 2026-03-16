@@ -4,6 +4,7 @@
 - `touchpad_usage.md`：触摸板接线、烧录、操作、串口命令、UI 配置。
 - `arduino_ide_supermini_setup.md`：Arduino IDE 板卡配置与 UF2 流程。
 - `bom.md`：物料与接线速查。
+- `v2_intro.md`：TouchPad V2 介绍文档与讲解提纲。
 - `windows_ui_packaging.md`：Windows 图形配置工具的打包与安装包发布流程。
 
 ## 功能与调参
@@ -21,5 +22,4 @@
 - `Promicro NRF52840开发板 兼容nice!nano V2.0 带蓝牙 充电管理-淘宝网.png`：开发板商品页截图。
 
 ## 其它
-- `video_intro_flow.md`：介绍视频脚本流程。
 - `next_optimization_notes.md`：后续硬件优化清单（底板布局、开关形态、FPC 引脚定义）。
