@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TouchpadConfigUI",
+  "version": "0.1.0",
+  "identifier": "com.touchpad.configui",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../web"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "触摸板配置",
+        "width": 980,
+        "height": 880,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}
