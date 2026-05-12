@@ -1,0 +1,62 @@
+name: Release ui_tauri (Win/Mac/Linux)
+
+on:
+  push:
+    tags:
+      - "ui-v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+          - os: windows-latest
+          - os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: tools/ui_tauri/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install npm deps
+        working-directory: tools/ui_tauri
+        run: npm ci
+
+      - name: Build + Upload to GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tools/ui_tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: "Touchpad UI ${{ github.ref_name }}"
+          releaseBody: "自动构建的 ui_tauri 三平台安装包。"
+          releaseDraft: false
+          prerelease: false
