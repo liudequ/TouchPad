@@ -49,6 +49,10 @@ jobs:
         working-directory: tools/ui_tauri
         run: npm ci
 
+      - name: Generate Tauri icons
+        working-directory: tools/ui_tauri
+        run: npm run tauri icon src-tauri/icons/icon.png
+
       - name: Build + Upload to GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
