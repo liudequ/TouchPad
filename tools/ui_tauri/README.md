@@ -1,6 +1,6 @@
 # Touchpad Config UI (Tauri)
 
-这是在 `tools/ui_tauri/` 下新建的 Tauri 版触摸板配置工具，功能对齐原 `tools/ui/touchpad_config_ui.py`：
+这是 `tools/ui_tauri/` 下的 Tauri 版触摸板配置工具：
 
 - USB 串口连接/断开
 - 读取当前配置（`GET`）

@@ -121,44 +121,25 @@ SET sideZonePercent 35
 SAVE
 ```
 
-## 上位机 UI（Python）
-可使用 `tools/ui/touchpad_config_ui.py` 图形化配置。
+## 上位机 UI（Tauri）
+可使用 `tools/ui_tauri` 图形化配置。
 
-依赖：
-- `pyserial`
-- `PySide6`
-- `bleak`（当前 nRF 固件仅保留 USB 串口调参，BLE 调参已移除）
-
-运行：
+本地开发：
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r tools/ui/requirements.txt
-python3 tools/ui/touchpad_config_ui.py
+cd tools/ui_tauri
+npm install
+npm run dev
 ```
 
-或直接：
+打包：
 ```bash
-tools/ui/run_ui.sh
+cd tools/ui_tauri
+npm run build
 ```
 
-## Windows 运行与发布
-
-如果只是自己在 Windows 上运行，可按下面步骤：
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r tools\ui\requirements.txt
-python tools\ui\touchpad_config_ui.py
-```
-
-如果需要发给不懂 Python 的普通用户，建议直接打包成 Windows 安装包。仓库已提供：
-
-- `tools/ui/build_windows_exe.bat`：生成 `exe` 发布目录
-- `tools/ui/windows_installer.iss`：Inno Setup 安装器脚本
-
-详细流程见 `docs/windows_ui_packaging.md`。
+说明：
+- 当前 nRF 固件使用 USB 串口调参，不使用 BLE 调参。
+- Windows、macOS、Linux 打包产物位置见 `tools/ui_tauri/README.md`。
 
 ## 串口权限（Linux）
 首次在新机器连接时，若遇到 `/dev/ttyACM0` 权限不足，可将当前用户加入 `dialout` 组：
